@@ -4,30 +4,38 @@ use std::io::{ self, Write, stdout };
 use std::time::Duration;
 use std::cmp;
 
-pub trait CustomKeyPressHandler {
+pub trait CustomInput {
     fn handle_key_press(&mut self, key: &Event) -> bool {
         false
     }
+    fn before_draw_text(&mut self, terminal_size: (u16, u16)) {}
+    fn after_draw_text(&mut self, terminal_size: (u16, u16)) {}
+    fn get_offset(&mut self, terminal_size: (u16, u16)) -> (u16, u16) {
+        (0, 0)
+    }
+    fn get_size(&mut self, terminal_size: (u16, u16)) -> (u16, u16) {
+        terminal_size
+    }
 }
-pub struct CoolInput<H: CustomKeyPressHandler> {
+pub struct DefaultInput;
+impl CustomInput for DefaultInput {}
+
+pub struct CoolInput<H: CustomInput> {
     pub text: String,
     pub cursor_x: usize,
     pub cursor_y: usize,
     pub listening: bool,
-    pub custom_key_handler: H,
+    pub custom_input: H,
 }
 
-pub struct NoneCustomKeyPressHandler;
-impl CustomKeyPressHandler for NoneCustomKeyPressHandler {}
-
-impl<H: CustomKeyPressHandler> CoolInput<H> {
+impl<H: CustomInput> CoolInput<H> {
     pub fn new(handler: H) -> Self {
         CoolInput {
             text: String::new(),
             cursor_x: 0,
             cursor_y: 0,
             listening: false,
-            custom_key_handler: handler,
+            custom_input: handler,
         }
     }
     pub fn render(&mut self) -> Result<(), std::io::Error> {
@@ -36,7 +44,12 @@ impl<H: CustomKeyPressHandler> CoolInput<H> {
         Ok(())
     }
     fn update_cursor(&mut self) -> Result<(), std::io::Error> {
-        execute!(stdout(), cursor::MoveTo(self.cursor_x as u16, self.cursor_y as u16))?;
+        let terminal_size = terminal::size()?;
+        let (offset_x, offset_y) = self.custom_input.get_offset(terminal_size);
+        execute!(
+            stdout(),
+            cursor::MoveTo((self.cursor_x as u16) + offset_x, (self.cursor_y as u16) + offset_y)
+        )?;
         Ok(())
     }
     fn insert_string(&mut self, c: char, x: usize, y: usize) {
@@ -102,34 +115,45 @@ impl<H: CustomKeyPressHandler> CoolInput<H> {
         Ok(())
     }
     fn update_text(&mut self) -> Result<(), std::io::Error> {
-        let size = terminal::size()?;
-        let height = size.1;
-        let width = size.0;
+        let terminal_size = terminal::size()?;
+        let (width, height) = self.custom_input.get_size(terminal_size);
+        let (offset_x, offset_y) = self.custom_input.get_offset(terminal_size);
+        self.custom_input.before_draw_text(terminal_size);
         let lines = self.text.lines().count();
 
         for y in 0..height {
-            if y < (lines as u16) {
-                let line = self.text
-                    .lines()
-                    .nth(y as usize)
-                    .ok_or_else(||
-                        std::io::Error::new(std::io::ErrorKind::Other, "Cursor at invalid position")
-                    )?;
-                print!(
-                    "\x1b[{};0H{}",
-                    y + 1,
-                    String::from(line) + &" ".repeat((width - (line.chars().count() as u16)).into())
-                );
-            } else {
-                print!("\x1b[{};0H{}", y + 1, " ".repeat(width as usize));
+            let y_line_index = y.checked_sub(offset_y);
+            if y_line_index.is_some() {
+                let y_line_index = y_line_index.unwrap();
+                if y_line_index < (lines as u16) {
+                    let line = self.text
+                        .lines()
+                        .nth(y_line_index as usize)
+                        .ok_or_else(||
+                            std::io::Error::new(
+                                std::io::ErrorKind::Other,
+                                "Cursor at invalid position"
+                            )
+                        )?;
+                    print!(
+                        "\x1b[{};0H{}",
+                        y + 1,
+                        String::from(" ").repeat(offset_x as usize) +
+                            &String::from(line) +
+                            &" ".repeat((width - (line.chars().count() as u16)).into())
+                    );
+                } else {
+                    print!("\x1b[{};0H{}", y + 1, " ".repeat(width as usize));
+                }
             }
         }
 
         io::stdout().flush()?;
+        self.custom_input.after_draw_text(terminal_size);
         Ok(())
     }
     pub fn handle_key_press(&mut self, key: Event) -> Result<(), std::io::Error> {
-        if self.custom_key_handler.handle_key_press(&key) {
+        if self.custom_input.handle_key_press(&key) {
             return Ok(());
         }
         match key {
@@ -271,12 +295,16 @@ impl<H: CustomKeyPressHandler> CoolInput<H> {
         Ok(())
     }
     pub fn listen(&mut self) -> Result<(), std::io::Error> {
+        let terminal_size = terminal::size()?;
+        let (offset_x, offset_y) = self.custom_input.get_offset(terminal_size);
+
         execute!(
             stdout(),
             terminal::Clear(terminal::ClearType::All),
             SetForegroundColor(Color::Blue),
-            cursor::MoveTo(self.cursor_x as u16, self.cursor_y as u16)
+            cursor::MoveTo((self.cursor_x as u16) + offset_x, (self.cursor_y as u16) + offset_y)
         )?;
+        self.render()?;
         self.listening = true;
         while self.listening {
             if event::poll(Duration::from_millis(50))? {
