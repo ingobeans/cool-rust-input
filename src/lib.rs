@@ -4,27 +4,33 @@ use std::io::{ self, Write, stdout };
 use std::time::Duration;
 use std::cmp;
 
-pub struct CoolInput {
+pub trait CustomKeyPressHandler {
+    fn handle_key_press(&mut self, key: &Event) -> bool;
+}
+pub struct CoolInput<H: CustomKeyPressHandler> {
     pub text: String,
     pub cursor_x: usize,
     pub cursor_y: usize,
     pub listening: bool,
+    pub custom_key_handler: H,
 }
 
-impl Default for CoolInput {
-    fn default() -> Self {
-        Self {
+pub struct NoneCustomKeyPressHandler;
+impl CustomKeyPressHandler for NoneCustomKeyPressHandler {
+    fn handle_key_press(&mut self, key: &Event) -> bool {
+        false
+    }
+}
+
+impl<H: CustomKeyPressHandler> CoolInput<H> {
+    pub fn new(handler: H) -> Self {
+        CoolInput {
             text: String::new(),
             cursor_x: 0,
             cursor_y: 0,
             listening: false,
+            custom_key_handler: handler,
         }
-    }
-}
-
-impl CoolInput {
-    pub fn new() -> Self {
-        Self::default()
     }
     pub fn render(&mut self) -> Result<(), std::io::Error> {
         self.update_text()?;
@@ -125,6 +131,9 @@ impl CoolInput {
         Ok(())
     }
     pub fn handle_key_press(&mut self, key: Event) -> Result<(), std::io::Error> {
+        if self.custom_key_handler.handle_key_press(&key) {
+            return Ok(());
+        }
         match key {
             Event::Key(key_event) => {
                 if key_event.kind == crossterm::event::KeyEventKind::Press {
