@@ -26,15 +26,14 @@ impl CoolInput {
     pub fn new() -> Self {
         Self::default()
     }
-    pub fn render(&mut self) {
-        self.update_text();
-        self.update_cursor();
+    pub fn render(&mut self) -> Result<(), std::io::Error> {
+        self.update_text()?;
+        self.update_cursor()?;
+        Ok(())
     }
-    fn update_cursor(&mut self) {
-        execute!(
-            stdout(),
-            cursor::MoveTo(self.cursor_x.try_into().unwrap(), self.cursor_y.try_into().unwrap())
-        ).unwrap();
+    fn update_cursor(&mut self) -> Result<(), std::io::Error> {
+        execute!(stdout(), cursor::MoveTo(self.cursor_x as u16, self.cursor_y as u16))?;
+        Ok(())
     }
     fn insert_string(&mut self, c: char, x: usize, y: usize) {
         let mut new = String::new();
@@ -64,14 +63,21 @@ impl CoolInput {
             self.text = new;
         }
     }
-    fn remove_character(&mut self, x: usize, y: usize) {
+    fn remove_character(&mut self, x: usize, y: usize) -> Result<(), std::io::Error> {
         let mut new = String::new();
         let mut cur_x = 0;
         let mut cur_y = 0;
 
         if x == 0 {
             self.cursor_y -= 1;
-            self.cursor_x = self.text.lines().nth(self.cursor_y).unwrap().chars().count();
+            self.cursor_x = self.text
+                .lines()
+                .nth(self.cursor_y)
+                .ok_or_else(||
+                    std::io::Error::new(std::io::ErrorKind::Other, "Cursor at invalid position")
+                )?
+                .chars()
+                .count();
         } else {
             self.cursor_x -= 1;
         }
@@ -89,9 +95,10 @@ impl CoolInput {
             }
         }
         self.text = new;
+        Ok(())
     }
-    fn update_text(&mut self) {
-        let size = terminal::size().unwrap();
+    fn update_text(&mut self) -> Result<(), std::io::Error> {
+        let size = terminal::size()?;
         let height = size.1;
         let width = size.0;
         let lines = self.text.lines().count();
@@ -101,7 +108,9 @@ impl CoolInput {
                 let line = self.text
                     .lines()
                     .nth(y as usize)
-                    .unwrap();
+                    .ok_or_else(||
+                        std::io::Error::new(std::io::ErrorKind::Other, "Cursor at invalid position")
+                    )?;
                 print!(
                     "\x1b[{};0H{}",
                     y + 1,
@@ -112,9 +121,10 @@ impl CoolInput {
             }
         }
 
-        io::stdout().flush().unwrap();
+        io::stdout().flush()?;
+        Ok(())
     }
-    pub fn on_key_press(&mut self, key: Event) {
+    pub fn handle_key_press(&mut self, key: Event) -> Result<(), std::io::Error> {
         match key {
             Event::Key(key_event) => {
                 if key_event.kind == crossterm::event::KeyEventKind::Press {
@@ -122,21 +132,21 @@ impl CoolInput {
                         KeyCode::Char(c) => {
                             self.insert_string(c, self.cursor_x, self.cursor_y);
                             self.cursor_x += 1;
-                            self.update_text();
-                            self.update_cursor();
+                            self.update_text()?;
+                            self.update_cursor()?;
                         }
                         KeyCode::Enter => {
                             self.insert_string('\n', self.cursor_x, self.cursor_y);
                             self.cursor_x = 0;
                             self.cursor_y += 1;
-                            self.update_text();
-                            self.update_cursor();
+                            self.update_text()?;
+                            self.update_cursor()?;
                         }
                         KeyCode::Backspace => {
                             if self.cursor_x > 0 || self.cursor_y != 0 {
-                                self.remove_character(self.cursor_x, self.cursor_y);
-                                self.update_text();
-                                self.update_cursor();
+                                self.remove_character(self.cursor_x, self.cursor_y)?;
+                                self.update_text()?;
+                                self.update_cursor()?;
                             }
                         }
                         KeyCode::Esc => {
@@ -146,11 +156,21 @@ impl CoolInput {
                             if self.cursor_y > 0 {
                                 self.cursor_y -= 1;
                                 self.cursor_x = cmp::min(
-                                    self.text.lines().nth(self.cursor_y).unwrap().chars().count(),
+                                    self.text
+                                        .lines()
+                                        .nth(self.cursor_y)
+                                        .ok_or_else(||
+                                            std::io::Error::new(
+                                                std::io::ErrorKind::Other,
+                                                "Cursor at invalid position"
+                                            )
+                                        )?
+                                        .chars()
+                                        .count(),
                                     self.cursor_x
                                 );
                             }
-                            self.update_cursor();
+                            self.update_cursor()?;
                         }
                         KeyCode::Down => {
                             if self.text.lines().count() > 0 {
@@ -160,12 +180,17 @@ impl CoolInput {
                                         self.text
                                             .lines()
                                             .nth(self.cursor_y)
-                                            .unwrap()
+                                            .ok_or_else(||
+                                                std::io::Error::new(
+                                                    std::io::ErrorKind::Other,
+                                                    "Cursor at invalid position"
+                                                )
+                                            )?
                                             .chars()
                                             .count(),
                                         self.cursor_x
                                     );
-                                    self.update_cursor();
+                                    self.update_cursor()?;
                                 }
                             }
                         }
@@ -178,12 +203,17 @@ impl CoolInput {
                                     self.cursor_x = self.text
                                         .lines()
                                         .nth(self.cursor_y)
-                                        .unwrap()
+                                        .ok_or_else(||
+                                            std::io::Error::new(
+                                                std::io::ErrorKind::Other,
+                                                "Cursor at invalid position"
+                                            )
+                                        )?
                                         .chars()
                                         .count();
                                 }
                             }
-                            self.update_cursor();
+                            self.update_cursor()?;
                         }
                         KeyCode::Right => {
                             if self.text.lines().count() > 0 {
@@ -193,7 +223,12 @@ impl CoolInput {
                                         self.text
                                             .lines()
                                             .nth(self.cursor_y)
-                                            .unwrap()
+                                            .ok_or_else(||
+                                                std::io::Error::new(
+                                                    std::io::ErrorKind::Other,
+                                                    "Cursor at invalid position"
+                                                )
+                                            )?
                                             .chars()
                                             .count()
                                 {
@@ -202,7 +237,12 @@ impl CoolInput {
                                         self.text
                                             .lines()
                                             .nth(self.cursor_y)
-                                            .unwrap()
+                                            .ok_or_else(||
+                                                std::io::Error::new(
+                                                    std::io::ErrorKind::Other,
+                                                    "Cursor at invalid position"
+                                                )
+                                            )?
                                             .chars()
                                             .count()
                                     {
@@ -211,7 +251,7 @@ impl CoolInput {
                                         self.cursor_y += 1;
                                         self.cursor_x = 0;
                                     }
-                                    self.update_cursor();
+                                    self.update_cursor()?;
                                 }
                             }
                         }
@@ -221,18 +261,19 @@ impl CoolInput {
             }
             _ => (),
         }
+        Ok(())
     }
-    pub fn listen(&mut self) {
+    pub fn listen(&mut self) -> Result<(), std::io::Error> {
         execute!(
             stdout(),
             terminal::Clear(terminal::ClearType::All),
             SetForegroundColor(Color::Blue),
-            cursor::MoveTo(self.cursor_x.try_into().unwrap(), self.cursor_y.try_into().unwrap())
-        ).unwrap();
+            cursor::MoveTo(self.cursor_x as u16, self.cursor_y as u16)
+        )?;
         self.listening = true;
         while self.listening {
-            if event::poll(Duration::from_millis(50)).unwrap() {
-                self.on_key_press(event::read().unwrap());
+            if event::poll(Duration::from_millis(50))? {
+                self.handle_key_press(event::read()?)?;
             }
         }
         execute!(
@@ -240,6 +281,7 @@ impl CoolInput {
             ResetColor,
             terminal::Clear(terminal::ClearType::All),
             cursor::MoveTo(0, 0)
-        ).unwrap();
+        )?;
+        Ok(())
     }
 }
