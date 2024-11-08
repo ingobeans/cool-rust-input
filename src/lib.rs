@@ -5,7 +5,9 @@ use std::time::Duration;
 use std::cmp;
 
 pub trait CustomKeyPressHandler {
-    fn handle_key_press(&mut self, key: &Event) -> bool;
+    fn handle_key_press(&mut self, key: &Event) -> bool {
+        false
+    }
 }
 pub struct CoolInput<H: CustomKeyPressHandler> {
     pub text: String,
@@ -16,11 +18,7 @@ pub struct CoolInput<H: CustomKeyPressHandler> {
 }
 
 pub struct NoneCustomKeyPressHandler;
-impl CustomKeyPressHandler for NoneCustomKeyPressHandler {
-    fn handle_key_press(&mut self, key: &Event) -> bool {
-        false
-    }
-}
+impl CustomKeyPressHandler for NoneCustomKeyPressHandler {}
 
 impl<H: CustomKeyPressHandler> CoolInput<H> {
     pub fn new(handler: H) -> Self {
