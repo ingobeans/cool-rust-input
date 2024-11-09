@@ -1,5 +1,7 @@
 use cool_rust_input::{ CoolInput, DefaultInput, CustomInput, set_terminal_line };
+use crossterm::{ execute, style::{ Color, SetForegroundColor, ResetColor } };
 use crossterm::event::{ Event, KeyCode };
+use std::io::{ stdout };
 
 pub struct CoolCustomInput;
 impl CustomInput for CoolCustomInput {
@@ -13,7 +15,11 @@ impl CustomInput for CoolCustomInput {
         }
         return false;
     }
+    fn before_draw_text(&mut self, terminal_size: (u16, u16)) {
+        let _ = execute!(stdout(), SetForegroundColor(Color::Green));
+    }
     fn after_draw_text(&mut self, terminal_size: (u16, u16)) {
+        let _ = execute!(stdout(), SetForegroundColor(Color::White));
         println!("\x1b[1;0H    Welcome to my cool text editor. Here you can write cool stuff!");
         println!("\x1b[2;0H    Rules: ");
         println!("\x1b[3;0H        None!!");
