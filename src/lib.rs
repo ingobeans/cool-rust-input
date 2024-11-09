@@ -54,7 +54,7 @@ pub fn set_terminal_line(text: &str, x: usize, y: usize) -> Result<(), std::io::
             String::from(" ").repeat(x) + text + &String::from(" ").repeat(pad_amount);
         print!("\x1b[{};0H{}", y + 1, text_padded);
     } else {
-        let text_padded = String::from("g").repeat(x) + text;
+        let text_padded = String::from(" ").repeat(x) + text;
         print!("\x1b[{};0H{}", y + 1, text_padded);
     }
     Ok(())
@@ -192,7 +192,8 @@ impl<H: CustomInput> CoolInput<H> {
                 .ok_or_else(||
                     std::io::Error::new(std::io::ErrorKind::Other, "Cursor at invalid position")
                 )?
-                .len();
+                .chars()
+                .count();
             self.update_cursor()?;
         }
         Ok(())
