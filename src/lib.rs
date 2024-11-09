@@ -1,7 +1,6 @@
 use crossterm::event::{ self, Event, KeyCode };
 use crossterm::{ execute, cursor, terminal, style::{ Color, SetForegroundColor, ResetColor } };
 use std::io::{ self, Write, stdout };
-use std::os::windows::process;
 use std::time::Duration;
 use std::cmp;
 
@@ -31,7 +30,7 @@ pub struct CoolInput<H: CustomInput> {
 
 pub fn set_terminal_line(text: &str, x: usize, y: usize) -> Result<(), std::io::Error> {
     let width = terminal::size()?.0;
-    let pad_amount = ((width as usize) + x).checked_sub(text.len());
+    let pad_amount = ((width as usize) - x).checked_sub(text.len());
     if pad_amount.is_some() {
         let pad_amount = pad_amount.unwrap();
         let text_padded =
@@ -62,11 +61,11 @@ impl<H: CustomInput> CoolInput<H> {
     }
     fn update_cursor(&mut self) -> Result<(), std::io::Error> {
         let terminal_size = terminal::size()?;
+        let (width, height) = self.custom_input.get_size(terminal_size);
         let (offset_x, offset_y) = self.custom_input.get_offset(terminal_size);
-        execute!(
-            stdout(),
-            cursor::MoveTo((self.cursor_x as u16) + offset_x, (self.cursor_y as u16) + offset_y)
-        )?;
+        let x = (self.cursor_x as u16) + offset_x;
+        let y = cmp::min((self.cursor_y as u16) + offset_y, offset_y + height - 1);
+        execute!(stdout(), cursor::MoveTo(x, y))?;
         Ok(())
     }
     fn insert_string(&mut self, c: char, x: usize, y: usize) {

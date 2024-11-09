@@ -33,10 +33,10 @@ impl CustomInput for CoolCustomInput {
         ).unwrap();
     }
     fn get_offset(&mut self, terminal_size: (u16, u16)) -> (u16, u16) {
-        (15, 4)
+        (5, 4)
     }
     fn get_size(&mut self, terminal_size: (u16, u16)) -> (u16, u16) {
-        (5, 5)
+        (terminal_size.0 - 10, 5)
     }
 }
 
