@@ -4,7 +4,9 @@ use std::io::{ self, Write, stdout };
 use std::time::Duration;
 use std::cmp;
 
+#[allow(unused_variables)]
 pub trait CustomInput {
+    #[allow(unused_variables)]
     fn handle_key_press(&mut self, key: &Event) -> bool {
         false
     }
@@ -68,7 +70,7 @@ impl<H: CustomInput> CoolInput<H> {
         let terminal_size = self.get_terminal_size()?;
         let (width, height) = self.custom_input.get_size(terminal_size);
         let (offset_x, offset_y) = self.custom_input.get_offset(terminal_size);
-        let x = (self.cursor_x as u16) + offset_x;
+        let x = cmp::min((self.cursor_x as u16) + offset_x, offset_x + width);
         let y = cmp::min((self.cursor_y as u16) + offset_y, offset_y + height - 1);
         execute!(stdout(), cursor::MoveTo(x, y))?;
         Ok(())
@@ -142,7 +144,7 @@ impl<H: CustomInput> CoolInput<H> {
     }
     fn update_text(&mut self) -> Result<(), std::io::Error> {
         let terminal_size = self.get_terminal_size()?;
-        let (width, height) = self.custom_input.get_size(terminal_size);
+        let (_width, height) = self.custom_input.get_size(terminal_size);
         let (offset_x, offset_y) = self.custom_input.get_offset(terminal_size);
         self.custom_input.before_draw_text(terminal_size);
         let lines = self.text.lines().count();

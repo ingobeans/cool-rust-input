@@ -1,3 +1,4 @@
+#[allow(unused_imports)]
 use cool_rust_input::{ CoolInput, DefaultInput, CustomInput, set_terminal_line };
 use crossterm::{ execute, style::{ Color, SetForegroundColor } };
 use crossterm::event::{ Event, KeyCode };
@@ -15,7 +16,7 @@ impl CustomInput for CoolCustomInput {
         }
         return false;
     }
-    fn before_draw_text(&mut self, terminal_size: (u16, u16)) {
+    fn before_draw_text(&mut self, _terminal_size: (u16, u16)) {
         let _ = execute!(stdout(), SetForegroundColor(Color::Green));
     }
     fn after_draw_text(&mut self, terminal_size: (u16, u16)) {
@@ -38,7 +39,7 @@ impl CustomInput for CoolCustomInput {
             3
         ).unwrap();
     }
-    fn get_offset(&mut self, terminal_size: (u16, u16)) -> (u16, u16) {
+    fn get_offset(&mut self, _terminal_size: (u16, u16)) -> (u16, u16) {
         (5, 5)
     }
     fn get_size(&mut self, terminal_size: (u16, u16)) -> (u16, u16) {
