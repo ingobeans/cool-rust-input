@@ -13,6 +13,11 @@ pub enum KeyPressResult {
 #[allow(unused_variables)]
 pub trait CustomInput {
     fn handle_key_press(&mut self, key: &Event) -> KeyPressResult {
+        if let Event::Key(key_event) = key {
+            if let KeyCode::Esc = key_event.code {
+                return KeyPressResult::Stop;
+            }
+        }
         KeyPressResult::Continue
     }
     fn before_draw_text(&mut self, terminal_size: (u16, u16)) {
@@ -212,9 +217,6 @@ impl<H: CustomInput> CoolInput<H> {
                                         self.update_text()?;
                                         self.update_cursor()?;
                                     }
-                                }
-                                KeyCode::Esc => {
-                                    self.listening = false;
                                 }
                                 KeyCode::Up => {
                                     if self.cursor_y > 0 {

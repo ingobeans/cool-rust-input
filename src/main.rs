@@ -8,6 +8,11 @@ pub struct CoolCustomInput;
 impl CustomInput for CoolCustomInput {
     fn handle_key_press(&mut self, key: &crossterm::event::Event) -> KeyPressResult {
         if let Event::Key(key_event) = key {
+            if let KeyCode::Esc = key_event.code {
+                return KeyPressResult::Stop;
+            }
+        }
+        if let Event::Key(key_event) = key {
             if let KeyCode::Char(c) = key_event.code {
                 if c == 'q' {
                     return KeyPressResult::Handled;
