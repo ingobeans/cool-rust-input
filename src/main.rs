@@ -1,20 +1,20 @@
 #[allow(unused_imports)]
-use cool_rust_input::{ CoolInput, DefaultInput, CustomInput, set_terminal_line };
+use cool_rust_input::{ CoolInput, DefaultInput, CustomInput, set_terminal_line, KeyPressResult };
 use crossterm::{ execute, style::{ Color, SetForegroundColor } };
 use crossterm::event::{ Event, KeyCode };
 use std::io::stdout;
 
 pub struct CoolCustomInput;
 impl CustomInput for CoolCustomInput {
-    fn handle_key_press(&mut self, key: &crossterm::event::Event) -> bool {
+    fn handle_key_press(&mut self, key: &crossterm::event::Event) -> KeyPressResult {
         if let Event::Key(key_event) = key {
             if let KeyCode::Char(c) = key_event.code {
                 if c == 'q' {
-                    return true;
+                    return KeyPressResult::Handled;
                 }
             }
         }
-        return false;
+        KeyPressResult::Continue
     }
     fn before_draw_text(&mut self, _terminal_size: (u16, u16)) {
         let _ = execute!(stdout(), SetForegroundColor(Color::Green));

@@ -4,10 +4,16 @@ use std::io::{ self, Write, stdout };
 use std::time::Duration;
 use std::cmp;
 
+pub enum KeyPressResult {
+    Handled,
+    Stop,
+    Continue,
+}
+
 #[allow(unused_variables)]
 pub trait CustomInput {
-    fn handle_key_press(&mut self, key: &Event) -> bool {
-        false
+    fn handle_key_press(&mut self, key: &Event) -> KeyPressResult {
+        KeyPressResult::Continue
     }
     fn before_draw_text(&mut self, terminal_size: (u16, u16)) {
         let _ = execute!(stdout(), SetForegroundColor(Color::Blue));
@@ -174,144 +180,152 @@ impl<H: CustomInput> CoolInput<H> {
         Ok(())
     }
     pub fn handle_key_press(&mut self, key: Event) -> Result<(), std::io::Error> {
-        if self.custom_input.handle_key_press(&key) {
-            return Ok(());
-        }
-        match key {
-            Event::Key(key_event) => {
-                if key_event.kind == crossterm::event::KeyEventKind::Press {
-                    match key_event.code {
-                        KeyCode::Char(c) => {
-                            self.insert_string(c, self.cursor_x, self.cursor_y);
-                            self.cursor_x += 1;
-                            self.update_text()?;
-                            self.update_cursor()?;
-                        }
-                        KeyCode::Enter => {
-                            self.insert_string('\n', self.cursor_x, self.cursor_y);
-                            self.cursor_x = 0;
-                            self.cursor_y += 1;
-                            self.update_text()?;
-                            self.update_cursor()?;
-                        }
-                        KeyCode::Backspace => {
-                            if self.cursor_x > 0 || self.cursor_y != 0 {
-                                self.remove_character(self.cursor_x, self.cursor_y)?;
-                                self.update_text()?;
-                                self.update_cursor()?;
-                            }
-                        }
-                        KeyCode::Esc => {
-                            self.listening = false;
-                        }
-                        KeyCode::Up => {
-                            if self.cursor_y > 0 {
-                                self.cursor_y -= 1;
-                                self.cursor_x = cmp::min(
-                                    self.text
-                                        .lines()
-                                        .nth(self.cursor_y)
-                                        .ok_or_else(||
-                                            std::io::Error::new(
-                                                std::io::ErrorKind::Other,
-                                                "Cursor at invalid position"
-                                            )
-                                        )?
-                                        .chars()
-                                        .count(),
-                                    self.cursor_x
-                                );
-                            }
-                            self.update_cursor()?;
-                        }
-                        KeyCode::Down => {
-                            if self.text.lines().count() > 0 {
-                                if self.cursor_y < self.text.lines().count() - 1 {
-                                    self.cursor_y += 1;
-                                    self.cursor_x = cmp::min(
-                                        self.text
-                                            .lines()
-                                            .nth(self.cursor_y)
-                                            .ok_or_else(||
-                                                std::io::Error::new(
-                                                    std::io::ErrorKind::Other,
-                                                    "Cursor at invalid position"
-                                                )
-                                            )?
-                                            .chars()
-                                            .count(),
-                                        self.cursor_x
-                                    );
+        match self.custom_input.handle_key_press(&key) {
+            KeyPressResult::Handled => {
+                return Ok(());
+            }
+            KeyPressResult::Stop => {
+                self.listening = false;
+                return Ok(());
+            }
+            KeyPressResult::Continue => {
+                match key {
+                    Event::Key(key_event) => {
+                        if key_event.kind == crossterm::event::KeyEventKind::Press {
+                            match key_event.code {
+                                KeyCode::Char(c) => {
+                                    self.insert_string(c, self.cursor_x, self.cursor_y);
+                                    self.cursor_x += 1;
+                                    self.update_text()?;
                                     self.update_cursor()?;
                                 }
-                            }
-                        }
-                        KeyCode::Left => {
-                            if self.cursor_x > 0 || self.cursor_y != 0 {
-                                if self.cursor_x > 0 {
-                                    self.cursor_x -= 1;
-                                } else {
-                                    self.cursor_y -= 1;
-                                    self.cursor_x = self.text
-                                        .lines()
-                                        .nth(self.cursor_y)
-                                        .ok_or_else(||
-                                            std::io::Error::new(
-                                                std::io::ErrorKind::Other,
-                                                "Cursor at invalid position"
-                                            )
-                                        )?
-                                        .chars()
-                                        .count();
+                                KeyCode::Enter => {
+                                    self.insert_string('\n', self.cursor_x, self.cursor_y);
+                                    self.cursor_x = 0;
+                                    self.cursor_y += 1;
+                                    self.update_text()?;
+                                    self.update_cursor()?;
                                 }
-                            }
-                            self.update_cursor()?;
-                        }
-                        KeyCode::Right => {
-                            if self.text.lines().count() > 0 {
-                                if
-                                    self.cursor_y != self.text.lines().count() - 1 ||
-                                    self.cursor_x <
-                                        self.text
-                                            .lines()
-                                            .nth(self.cursor_y)
-                                            .ok_or_else(||
-                                                std::io::Error::new(
-                                                    std::io::ErrorKind::Other,
-                                                    "Cursor at invalid position"
-                                                )
-                                            )?
-                                            .chars()
-                                            .count()
-                                {
-                                    if
-                                        self.cursor_x !=
-                                        self.text
-                                            .lines()
-                                            .nth(self.cursor_y)
-                                            .ok_or_else(||
-                                                std::io::Error::new(
-                                                    std::io::ErrorKind::Other,
-                                                    "Cursor at invalid position"
-                                                )
-                                            )?
-                                            .chars()
-                                            .count()
-                                    {
-                                        self.cursor_x += 1;
-                                    } else {
-                                        self.cursor_y += 1;
-                                        self.cursor_x = 0;
+                                KeyCode::Backspace => {
+                                    if self.cursor_x > 0 || self.cursor_y != 0 {
+                                        self.remove_character(self.cursor_x, self.cursor_y)?;
+                                        self.update_text()?;
+                                        self.update_cursor()?;
+                                    }
+                                }
+                                KeyCode::Esc => {
+                                    self.listening = false;
+                                }
+                                KeyCode::Up => {
+                                    if self.cursor_y > 0 {
+                                        self.cursor_y -= 1;
+                                        self.cursor_x = cmp::min(
+                                            self.text
+                                                .lines()
+                                                .nth(self.cursor_y)
+                                                .ok_or_else(||
+                                                    std::io::Error::new(
+                                                        std::io::ErrorKind::Other,
+                                                        "Cursor at invalid position"
+                                                    )
+                                                )?
+                                                .chars()
+                                                .count(),
+                                            self.cursor_x
+                                        );
                                     }
                                     self.update_cursor()?;
                                 }
+                                KeyCode::Down => {
+                                    if self.text.lines().count() > 0 {
+                                        if self.cursor_y < self.text.lines().count() - 1 {
+                                            self.cursor_y += 1;
+                                            self.cursor_x = cmp::min(
+                                                self.text
+                                                    .lines()
+                                                    .nth(self.cursor_y)
+                                                    .ok_or_else(||
+                                                        std::io::Error::new(
+                                                            std::io::ErrorKind::Other,
+                                                            "Cursor at invalid position"
+                                                        )
+                                                    )?
+                                                    .chars()
+                                                    .count(),
+                                                self.cursor_x
+                                            );
+                                            self.update_cursor()?;
+                                        }
+                                    }
+                                }
+                                KeyCode::Left => {
+                                    if self.cursor_x > 0 || self.cursor_y != 0 {
+                                        if self.cursor_x > 0 {
+                                            self.cursor_x -= 1;
+                                        } else {
+                                            self.cursor_y -= 1;
+                                            self.cursor_x = self.text
+                                                .lines()
+                                                .nth(self.cursor_y)
+                                                .ok_or_else(||
+                                                    std::io::Error::new(
+                                                        std::io::ErrorKind::Other,
+                                                        "Cursor at invalid position"
+                                                    )
+                                                )?
+                                                .chars()
+                                                .count();
+                                        }
+                                    }
+                                    self.update_cursor()?;
+                                }
+                                KeyCode::Right => {
+                                    if self.text.lines().count() > 0 {
+                                        if
+                                            self.cursor_y != self.text.lines().count() - 1 ||
+                                            self.cursor_x <
+                                                self.text
+                                                    .lines()
+                                                    .nth(self.cursor_y)
+                                                    .ok_or_else(||
+                                                        std::io::Error::new(
+                                                            std::io::ErrorKind::Other,
+                                                            "Cursor at invalid position"
+                                                        )
+                                                    )?
+                                                    .chars()
+                                                    .count()
+                                        {
+                                            if
+                                                self.cursor_x !=
+                                                self.text
+                                                    .lines()
+                                                    .nth(self.cursor_y)
+                                                    .ok_or_else(||
+                                                        std::io::Error::new(
+                                                            std::io::ErrorKind::Other,
+                                                            "Cursor at invalid position"
+                                                        )
+                                                    )?
+                                                    .chars()
+                                                    .count()
+                                            {
+                                                self.cursor_x += 1;
+                                            } else {
+                                                self.cursor_y += 1;
+                                                self.cursor_x = 0;
+                                            }
+                                            self.update_cursor()?;
+                                        }
+                                    }
+                                }
+                                _ => {}
                             }
                         }
-                        _ => {}
                     }
+                    _ => (),
                 }
             }
-            _ => (),
         }
         Ok(())
     }
