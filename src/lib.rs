@@ -6,7 +6,6 @@ use std::cmp;
 
 #[allow(unused_variables)]
 pub trait CustomInput {
-    #[allow(unused_variables)]
     fn handle_key_press(&mut self, key: &Event) -> bool {
         false
     }
