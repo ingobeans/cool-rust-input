@@ -19,24 +19,25 @@ impl CustomInput for CoolCustomInput {
         //println!("\x1b[3;0H        None!!");
         //println!("\x1b[4;0H    {}", String::from("_").repeat((terminal_size.0 as usize) - 10));
 
-        set_terminal_line(
-            "Welcome to my cool text editor. Here you can write cool stuff!",
-            5,
-            0
-        ).unwrap();
-        set_terminal_line("Rules:", 5, 1).unwrap();
-        set_terminal_line("None!!", 10, 2).unwrap();
-        set_terminal_line(
-            &String::from("_").repeat((terminal_size.0 as usize) - 10),
-            5,
-            3
-        ).unwrap();
+        //set_terminal_line(
+        //    "Welcome to my cool text editor. Here you can write cool stuff!",
+        //    5,
+        //    0
+        //).unwrap();
+        //set_terminal_line("Rules:", 5, 1).unwrap();
+        //set_terminal_line("None!!", 10, 2).unwrap();
+        //set_terminal_line(
+        //    &String::from("_").repeat((terminal_size.0 as usize) - 10),
+        //    5,
+        //    3
+        //).unwrap();
     }
     fn get_offset(&mut self, terminal_size: (u16, u16)) -> (u16, u16) {
-        (5, 4)
+        (0, 0)
     }
     fn get_size(&mut self, terminal_size: (u16, u16)) -> (u16, u16) {
-        (terminal_size.0 - 10, 5)
+        //(terminal_size.0 - 10, 5)
+        (terminal_size.0, terminal_size.1)
     }
 }
 

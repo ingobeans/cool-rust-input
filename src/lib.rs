@@ -38,7 +38,7 @@ pub fn set_terminal_line(text: &str, x: usize, y: usize) -> Result<(), std::io::
         //println!("\x1b[{};0H{}-{}", line_index, pad_amount, text_padded);
         println!("\x1b[{};0H{}", y + 1, text_padded);
     } else {
-        let text_padded = String::from(" ").repeat(x) + text;
+        let text_padded = String::from("g").repeat(x) + text;
         println!("\x1b[{};0H{}", y + 1, text_padded);
     }
     Ok(())
@@ -60,13 +60,18 @@ impl<H: CustomInput> CoolInput<H> {
         Ok(())
     }
     fn update_cursor(&mut self) -> Result<(), std::io::Error> {
-        let terminal_size = terminal::size()?;
+        let terminal_size = self.get_terminal_size()?;
         let (width, height) = self.custom_input.get_size(terminal_size);
         let (offset_x, offset_y) = self.custom_input.get_offset(terminal_size);
         let x = (self.cursor_x as u16) + offset_x;
         let y = cmp::min((self.cursor_y as u16) + offset_y, offset_y + height - 1);
         execute!(stdout(), cursor::MoveTo(x, y))?;
         Ok(())
+    }
+    pub fn get_terminal_size(&mut self) -> Result<(u16, u16), std::io::Error> {
+        let mut terminal_size = terminal::size()?;
+        terminal_size.1 -= 1;
+        Ok(terminal_size)
     }
     fn insert_string(&mut self, c: char, x: usize, y: usize) {
         let mut new = String::new();
@@ -131,13 +136,13 @@ impl<H: CustomInput> CoolInput<H> {
         Ok(())
     }
     fn update_text(&mut self) -> Result<(), std::io::Error> {
-        let terminal_size = terminal::size()?;
+        let terminal_size = self.get_terminal_size()?;
         let (width, height) = self.custom_input.get_size(terminal_size);
         let (offset_x, offset_y) = self.custom_input.get_offset(terminal_size);
         self.custom_input.before_draw_text(terminal_size);
         let lines = self.text.lines().count();
 
-        for y in 0..height + offset_y {
+        for y in 0..cmp::min(height + offset_y, terminal_size.1) {
             let y_line_index = y.checked_sub(offset_y);
             if y_line_index.is_some() {
                 let y_line_index = y_line_index.unwrap();
@@ -305,7 +310,7 @@ impl<H: CustomInput> CoolInput<H> {
         Ok(())
     }
     pub fn listen(&mut self) -> Result<(), std::io::Error> {
-        let terminal_size = terminal::size()?;
+        let terminal_size = self.get_terminal_size()?;
         let (offset_x, offset_y) = self.custom_input.get_offset(terminal_size);
 
         execute!(
