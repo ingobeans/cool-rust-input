@@ -235,6 +235,8 @@ impl<H: CustomInput> CoolInput<H> {
                                                 .count(),
                                             self.cursor_x
                                         );
+                                    } else {
+                                        self.cursor_x = 0;
                                     }
                                     self.update_cursor()?;
                                 }
@@ -256,8 +258,19 @@ impl<H: CustomInput> CoolInput<H> {
                                                     .count(),
                                                 self.cursor_x
                                             );
-                                            self.update_cursor()?;
+                                        } else {
+                                            self.cursor_x = self.text
+                                                .lines()
+                                                .nth(self.cursor_y)
+                                                .ok_or_else(||
+                                                    std::io::Error::new(
+                                                        std::io::ErrorKind::Other,
+                                                        "Cursor at invalid position"
+                                                    )
+                                                )?
+                                                .len();
                                         }
+                                        self.update_cursor()?;
                                     }
                                 }
                                 KeyCode::Left => {
@@ -319,6 +332,25 @@ impl<H: CustomInput> CoolInput<H> {
                                             }
                                             self.update_cursor()?;
                                         }
+                                    }
+                                }
+                                KeyCode::Home => {
+                                    self.cursor_x = 0;
+                                    self.update_cursor()?;
+                                }
+                                KeyCode::End => {
+                                    if self.text.lines().count() > 0 {
+                                        self.cursor_x = self.text
+                                            .lines()
+                                            .nth(self.cursor_y)
+                                            .ok_or_else(||
+                                                std::io::Error::new(
+                                                    std::io::ErrorKind::Other,
+                                                    "Cursor at invalid position"
+                                                )
+                                            )?
+                                            .len();
+                                        self.update_cursor()?;
                                     }
                                 }
                                 _ => {}
