@@ -1,7 +1,7 @@
 use cool_rust_input::{ CoolInput, DefaultInput, CustomInput, set_terminal_line };
-use crossterm::{ execute, style::{ Color, SetForegroundColor, ResetColor } };
+use crossterm::{ execute, style::{ Color, SetForegroundColor } };
 use crossterm::event::{ Event, KeyCode };
-use std::io::{ stdout };
+use std::io::stdout;
 
 pub struct CoolCustomInput;
 impl CustomInput for CoolCustomInput {
