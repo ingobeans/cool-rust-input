@@ -42,7 +42,7 @@ impl CustomInput for CoolCustomInput {
 }
 
 fn main() {
-    let mut cool_input = CoolInput::new(CoolCustomInput);
-    //let mut cool_input = CoolInput::new(DefaultInput);
+    //let mut cool_input = CoolInput::new(CoolCustomInput);
+    let mut cool_input = CoolInput::new(DefaultInput);
     cool_input.listen().unwrap();
 }

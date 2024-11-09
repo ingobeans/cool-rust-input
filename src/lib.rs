@@ -29,17 +29,17 @@ pub struct CoolInput<H: CustomInput> {
 }
 
 pub fn set_terminal_line(text: &str, x: usize, y: usize) -> Result<(), std::io::Error> {
+    execute!(stdout(), cursor::Hide)?;
     let width = terminal::size()?.0;
     let pad_amount = ((width as usize) - x).checked_sub(text.len());
     if pad_amount.is_some() {
         let pad_amount = pad_amount.unwrap();
         let text_padded =
             String::from(" ").repeat(x) + text + &String::from(" ").repeat(pad_amount);
-        //println!("\x1b[{};0H{}-{}", line_index, pad_amount, text_padded);
-        println!("\x1b[{};0H{}", y + 1, text_padded);
+        print!("\x1b[{};0H{}", y + 1, text_padded);
     } else {
         let text_padded = String::from("g").repeat(x) + text;
-        println!("\x1b[{};0H{}", y + 1, text_padded);
+        print!("\x1b[{};0H{}", y + 1, text_padded);
     }
     Ok(())
 }
@@ -60,6 +60,7 @@ impl<H: CustomInput> CoolInput<H> {
         Ok(())
     }
     fn update_cursor(&mut self) -> Result<(), std::io::Error> {
+        execute!(stdout(), cursor::Show)?;
         let terminal_size = self.get_terminal_size()?;
         let (width, height) = self.custom_input.get_size(terminal_size);
         let (offset_x, offset_y) = self.custom_input.get_offset(terminal_size);
