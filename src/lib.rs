@@ -1,6 +1,7 @@
 use crossterm::event::{ self, Event, KeyCode };
 use crossterm::{ execute, cursor, terminal, style::{ Color, SetForegroundColor, ResetColor } };
 use std::io::{ self, Write, stdout };
+use std::os::windows::process;
 use std::time::Duration;
 use std::cmp;
 
@@ -26,6 +27,22 @@ pub struct CoolInput<H: CustomInput> {
     pub cursor_y: usize,
     pub listening: bool,
     pub custom_input: H,
+}
+
+pub fn set_terminal_line(text: &str, x: usize, y: usize) -> Result<(), std::io::Error> {
+    let width = terminal::size()?.0;
+    let pad_amount = ((width as usize) + x).checked_sub(text.len());
+    if pad_amount.is_some() {
+        let pad_amount = pad_amount.unwrap();
+        let text_padded =
+            String::from(" ").repeat(x) + text + &String::from(" ").repeat(pad_amount);
+        //println!("\x1b[{};0H{}-{}", line_index, pad_amount, text_padded);
+        println!("\x1b[{};0H{}", y + 1, text_padded);
+    } else {
+        let text_padded = String::from(" ").repeat(x) + text;
+        println!("\x1b[{};0H{}", y + 1, text_padded);
+    }
+    Ok(())
 }
 
 impl<H: CustomInput> CoolInput<H> {
@@ -121,7 +138,7 @@ impl<H: CustomInput> CoolInput<H> {
         self.custom_input.before_draw_text(terminal_size);
         let lines = self.text.lines().count();
 
-        for y in 0..height {
+        for y in 0..height + offset_y {
             let y_line_index = y.checked_sub(offset_y);
             if y_line_index.is_some() {
                 let y_line_index = y_line_index.unwrap();
@@ -135,15 +152,9 @@ impl<H: CustomInput> CoolInput<H> {
                                 "Cursor at invalid position"
                             )
                         )?;
-                    print!(
-                        "\x1b[{};0H{}",
-                        y + 1,
-                        String::from(" ").repeat(offset_x as usize) +
-                            &String::from(line) +
-                            &" ".repeat((width - (line.chars().count() as u16)).into())
-                    );
+                    set_terminal_line(&String::from(line), offset_x as usize, y as usize)?;
                 } else {
-                    print!("\x1b[{};0H{}", y + 1, " ".repeat(width as usize));
+                    set_terminal_line("", offset_x as usize, y as usize)?;
                 }
             }
         }
