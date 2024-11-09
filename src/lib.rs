@@ -184,6 +184,19 @@ impl<H: CustomInput> CoolInput<H> {
         io::stdout().flush()?;
         Ok(())
     }
+    fn move_cursor_end(&mut self) -> Result<(), std::io::Error> {
+        if self.text.lines().count() > 0 {
+            self.cursor_x = self.text
+                .lines()
+                .nth(self.cursor_y)
+                .ok_or_else(||
+                    std::io::Error::new(std::io::ErrorKind::Other, "Cursor at invalid position")
+                )?
+                .len();
+            self.update_cursor()?;
+        }
+        Ok(())
+    }
     pub fn handle_key_press(&mut self, key: Event) -> Result<(), std::io::Error> {
         match self.custom_input.handle_key_press(&key) {
             KeyPressResult::Handled => {
@@ -259,16 +272,7 @@ impl<H: CustomInput> CoolInput<H> {
                                                 self.cursor_x
                                             );
                                         } else {
-                                            self.cursor_x = self.text
-                                                .lines()
-                                                .nth(self.cursor_y)
-                                                .ok_or_else(||
-                                                    std::io::Error::new(
-                                                        std::io::ErrorKind::Other,
-                                                        "Cursor at invalid position"
-                                                    )
-                                                )?
-                                                .len();
+                                            self.move_cursor_end()?;
                                         }
                                         self.update_cursor()?;
                                     }
@@ -339,19 +343,7 @@ impl<H: CustomInput> CoolInput<H> {
                                     self.update_cursor()?;
                                 }
                                 KeyCode::End => {
-                                    if self.text.lines().count() > 0 {
-                                        self.cursor_x = self.text
-                                            .lines()
-                                            .nth(self.cursor_y)
-                                            .ok_or_else(||
-                                                std::io::Error::new(
-                                                    std::io::ErrorKind::Other,
-                                                    "Cursor at invalid position"
-                                                )
-                                            )?
-                                            .len();
-                                        self.update_cursor()?;
-                                    }
+                                    self.move_cursor_end()?;
                                 }
                                 _ => {}
                             }
