@@ -142,6 +142,7 @@ impl<H: CustomInput> CoolInput<H> {
         let (offset_x, offset_y) = self.custom_input.get_offset(terminal_size);
         self.custom_input.before_draw_text(terminal_size);
         let lines = self.text.lines().count();
+        execute!(stdout(), SetForegroundColor(Color::Blue))?;
 
         for y in 0..cmp::min(height + offset_y, terminal_size.1) {
             let y_line_index = y.checked_sub(offset_y);
@@ -164,6 +165,7 @@ impl<H: CustomInput> CoolInput<H> {
             }
         }
 
+        execute!(stdout(), ResetColor)?;
         io::stdout().flush()?;
         self.custom_input.after_draw_text(terminal_size);
         Ok(())
@@ -317,7 +319,6 @@ impl<H: CustomInput> CoolInput<H> {
         execute!(
             stdout(),
             terminal::Clear(terminal::ClearType::All),
-            SetForegroundColor(Color::Blue),
             cursor::MoveTo((self.cursor_x as u16) + offset_x, (self.cursor_y as u16) + offset_y)
         )?;
         self.render()?;
