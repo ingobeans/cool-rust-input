@@ -12,7 +12,7 @@ pub enum KeyPressResult {
 
 #[allow(unused_variables)]
 pub trait CustomInput {
-    fn handle_key_press(&mut self, key: &Event) -> KeyPressResult {
+    fn handle_key_press(&mut self, key: &Event, current_text: String) -> KeyPressResult {
         if let Event::Key(key_event) = key {
             if let KeyCode::Esc = key_event.code {
                 return KeyPressResult::Stop;
@@ -20,16 +20,16 @@ pub trait CustomInput {
         }
         KeyPressResult::Continue
     }
-    fn before_draw_text(&mut self, terminal_size: (u16, u16)) {
+    fn before_draw_text(&mut self, terminal_size: (u16, u16), current_text: String) {
         let _ = execute!(stdout(), SetForegroundColor(Color::Blue));
     }
-    fn after_draw_text(&mut self, terminal_size: (u16, u16)) {
+    fn after_draw_text(&mut self, terminal_size: (u16, u16), current_text: String) {
         let _ = execute!(stdout(), ResetColor);
     }
-    fn get_offset(&mut self, terminal_size: (u16, u16)) -> (u16, u16) {
+    fn get_offset(&mut self, terminal_size: (u16, u16), current_text: String) -> (u16, u16) {
         (0, 0)
     }
-    fn get_size(&mut self, terminal_size: (u16, u16)) -> (u16, u16) {
+    fn get_size(&mut self, terminal_size: (u16, u16), current_text: String) -> (u16, u16) {
         terminal_size
     }
 }
@@ -78,8 +78,11 @@ impl<H: CustomInput> CoolInput<H> {
     fn update_cursor(&mut self) -> Result<(), std::io::Error> {
         execute!(stdout(), cursor::Show)?;
         let terminal_size = self.get_terminal_size()?;
-        let (width, height) = self.custom_input.get_size(terminal_size);
-        let (offset_x, offset_y) = self.custom_input.get_offset(terminal_size);
+        let (width, height) = self.custom_input.get_size(terminal_size, self.text.to_string());
+        let (offset_x, offset_y) = self.custom_input.get_offset(
+            terminal_size,
+            self.text.to_string()
+        );
         let x = cmp::min((self.cursor_x as u16) + offset_x, offset_x + width);
         let y = cmp::min((self.cursor_y as u16) + offset_y, offset_y + height - 1);
         execute!(stdout(), cursor::MoveTo(x, y))?;
@@ -147,9 +150,12 @@ impl<H: CustomInput> CoolInput<H> {
     }
     fn update_text(&mut self) -> Result<(), std::io::Error> {
         let terminal_size = self.get_terminal_size()?;
-        let (_width, height) = self.custom_input.get_size(terminal_size);
-        let (offset_x, offset_y) = self.custom_input.get_offset(terminal_size);
-        self.custom_input.before_draw_text(terminal_size);
+        let (_width, height) = self.custom_input.get_size(terminal_size, self.text.to_string());
+        let (offset_x, offset_y) = self.custom_input.get_offset(
+            terminal_size,
+            self.text.to_string()
+        );
+        self.custom_input.before_draw_text(terminal_size, self.text.to_string());
         let lines = self.get_amt_lines();
 
         for y in 0..cmp::min(height + offset_y, terminal_size.1) {
@@ -165,7 +171,7 @@ impl<H: CustomInput> CoolInput<H> {
             }
         }
 
-        self.custom_input.after_draw_text(terminal_size);
+        self.custom_input.after_draw_text(terminal_size, self.text.to_string());
         io::stdout().flush()?;
         Ok(())
     }
@@ -190,7 +196,7 @@ impl<H: CustomInput> CoolInput<H> {
         Ok(self.get_line_at(self.cursor_y)?.chars().count())
     }
     pub fn handle_key_press(&mut self, key: Event) -> Result<(), std::io::Error> {
-        match self.custom_input.handle_key_press(&key) {
+        match self.custom_input.handle_key_press(&key, self.text.to_string()) {
             KeyPressResult::Handled => {
                 return Ok(());
             }
@@ -310,7 +316,10 @@ impl<H: CustomInput> CoolInput<H> {
     }
     pub fn listen(&mut self) -> Result<(), std::io::Error> {
         let terminal_size = self.get_terminal_size()?;
-        let (offset_x, offset_y) = self.custom_input.get_offset(terminal_size);
+        let (offset_x, offset_y) = self.custom_input.get_offset(
+            terminal_size,
+            self.text.to_string()
+        );
 
         execute!(
             stdout(),

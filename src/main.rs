@@ -6,7 +6,11 @@ use std::io::stdout;
 
 pub struct CoolCustomInput;
 impl CustomInput for CoolCustomInput {
-    fn handle_key_press(&mut self, key: &crossterm::event::Event) -> KeyPressResult {
+    fn handle_key_press(
+        &mut self,
+        key: &crossterm::event::Event,
+        _current_text: String
+    ) -> KeyPressResult {
         if let Event::Key(key_event) = key {
             if let KeyCode::Esc = key_event.code {
                 return KeyPressResult::Stop;
@@ -21,10 +25,10 @@ impl CustomInput for CoolCustomInput {
         }
         KeyPressResult::Continue
     }
-    fn before_draw_text(&mut self, _terminal_size: (u16, u16)) {
+    fn before_draw_text(&mut self, _terminal_size: (u16, u16), _current_text: String) {
         let _ = execute!(stdout(), SetForegroundColor(Color::Green));
     }
-    fn after_draw_text(&mut self, terminal_size: (u16, u16)) {
+    fn after_draw_text(&mut self, terminal_size: (u16, u16), _current_text: String) {
         let _ = execute!(stdout(), SetForegroundColor(Color::White));
         println!("\x1b[1;0H    Welcome to my cool text editor. Here you can write cool stuff!");
         println!("\x1b[2;0H    Rules: ");
@@ -44,10 +48,10 @@ impl CustomInput for CoolCustomInput {
             3
         ).unwrap();
     }
-    fn get_offset(&mut self, _terminal_size: (u16, u16)) -> (u16, u16) {
+    fn get_offset(&mut self, _terminal_size: (u16, u16), _current_text: String) -> (u16, u16) {
         (5, 5)
     }
-    fn get_size(&mut self, terminal_size: (u16, u16)) -> (u16, u16) {
+    fn get_size(&mut self, terminal_size: (u16, u16), _current_text: String) -> (u16, u16) {
         (terminal_size.0 - 10, 5)
     }
 }
