@@ -314,6 +314,15 @@ impl<H: CustomInput> CoolInput<H> {
         }
         Ok(())
     }
+    pub fn listen_quiet(&mut self) -> Result<(), std::io::Error> {
+        self.listening = true;
+        while self.listening {
+            if event::poll(Duration::from_millis(50))? {
+                self.handle_key_press(event::read()?)?;
+            }
+        }
+        Ok(())
+    }
     pub fn listen(&mut self) -> Result<(), std::io::Error> {
         let terminal_size = self.get_terminal_size()?;
         let (offset_x, offset_y) = self.custom_input.get_offset(
@@ -327,12 +336,7 @@ impl<H: CustomInput> CoolInput<H> {
             cursor::MoveTo((self.cursor_x as u16) + offset_x, (self.cursor_y as u16) + offset_y)
         )?;
         self.render()?;
-        self.listening = true;
-        while self.listening {
-            if event::poll(Duration::from_millis(50))? {
-                self.handle_key_press(event::read()?)?;
-            }
-        }
+        self.listen_quiet()?;
         execute!(
             stdout(),
             ResetColor,

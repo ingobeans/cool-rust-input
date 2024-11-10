@@ -12,14 +12,14 @@ impl CustomInput for CoolCustomInput {
         _current_text: String
     ) -> KeyPressResult {
         if let Event::Key(key_event) = key {
-            if let KeyCode::Esc = key_event.code {
-                return KeyPressResult::Stop;
-            }
-        }
-        if let Event::Key(key_event) = key {
-            if let KeyCode::Char(c) = key_event.code {
-                if c == 'q' {
-                    return KeyPressResult::Handled;
+            if key_event.kind == crossterm::event::KeyEventKind::Press {
+                if let KeyCode::Esc = key_event.code {
+                    return KeyPressResult::Stop;
+                }
+                if let KeyCode::Char(c) = key_event.code {
+                    if c == 'q' {
+                        return KeyPressResult::Handled;
+                    }
                 }
             }
         }
