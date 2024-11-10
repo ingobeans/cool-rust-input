@@ -125,14 +125,7 @@ impl<H: CustomInput> CoolInput<H> {
 
         if x == 0 {
             self.cursor_y -= 1;
-            self.cursor_x = self.text
-                .lines()
-                .nth(self.cursor_y)
-                .ok_or_else(||
-                    std::io::Error::new(std::io::ErrorKind::Other, "Cursor at invalid position")
-                )?
-                .chars()
-                .count();
+            self.cursor_x = self.get_current_line_length()?;
         } else {
             self.cursor_x -= 1;
         }
@@ -157,22 +150,14 @@ impl<H: CustomInput> CoolInput<H> {
         let (_width, height) = self.custom_input.get_size(terminal_size);
         let (offset_x, offset_y) = self.custom_input.get_offset(terminal_size);
         self.custom_input.before_draw_text(terminal_size);
-        let lines = self.text.lines().count();
+        let lines = self.get_amt_lines();
 
         for y in 0..cmp::min(height + offset_y, terminal_size.1) {
             let y_line_index = y.checked_sub(offset_y);
             if y_line_index.is_some() {
                 let y_line_index = y_line_index.unwrap();
                 if y_line_index < (lines as u16) {
-                    let line = self.text
-                        .lines()
-                        .nth(y_line_index as usize)
-                        .ok_or_else(||
-                            std::io::Error::new(
-                                std::io::ErrorKind::Other,
-                                "Cursor at invalid position"
-                            )
-                        )?;
+                    let line = self.get_line_at(y_line_index as usize)?;
                     set_terminal_line(&String::from(line), offset_x as usize, y as usize)?;
                 } else {
                     set_terminal_line("", offset_x as usize, y as usize)?;
@@ -185,18 +170,24 @@ impl<H: CustomInput> CoolInput<H> {
         Ok(())
     }
     fn move_cursor_end(&mut self) -> Result<(), std::io::Error> {
-        if self.text.lines().count() > 0 {
-            self.cursor_x = self.text
-                .lines()
-                .nth(self.cursor_y)
-                .ok_or_else(||
-                    std::io::Error::new(std::io::ErrorKind::Other, "Cursor at invalid position")
-                )?
-                .chars()
-                .count();
+        if self.get_amt_lines() > 0 {
+            self.cursor_x = self.get_current_line_length()?;
             self.update_cursor()?;
         }
         Ok(())
+    }
+    fn get_amt_lines(&mut self) -> usize {
+        let mut amt = self.text.lines().count();
+        if self.text.ends_with("\n") {
+            amt += 1;
+        }
+        amt
+    }
+    fn get_line_at(&mut self, y: usize) -> Result<String, std::io::Error> {
+        Ok(self.text.lines().nth(y).unwrap_or("").to_string())
+    }
+    fn get_current_line_length(&mut self) -> Result<usize, std::io::Error> {
+        Ok(self.get_line_at(self.cursor_y)?.chars().count())
     }
     pub fn handle_key_press(&mut self, key: Event) -> Result<(), std::io::Error> {
         match self.custom_input.handle_key_press(&key) {
@@ -232,21 +223,26 @@ impl<H: CustomInput> CoolInput<H> {
                                         self.update_cursor()?;
                                     }
                                 }
+                                KeyCode::Delete => {
+                                    if self.get_amt_lines() > 0 {
+                                        let line_length = self.get_current_line_length()?;
+                                        if
+                                            line_length > 0 &&
+                                            (self.cursor_x < line_length ||
+                                                self.cursor_y != self.get_amt_lines() - 1)
+                                        {
+                                            self.cursor_x += 1;
+                                            self.remove_character(self.cursor_x, self.cursor_y)?;
+                                            self.update_text()?;
+                                            self.update_cursor()?;
+                                        }
+                                    }
+                                }
                                 KeyCode::Up => {
                                     if self.cursor_y > 0 {
                                         self.cursor_y -= 1;
                                         self.cursor_x = cmp::min(
-                                            self.text
-                                                .lines()
-                                                .nth(self.cursor_y)
-                                                .ok_or_else(||
-                                                    std::io::Error::new(
-                                                        std::io::ErrorKind::Other,
-                                                        "Cursor at invalid position"
-                                                    )
-                                                )?
-                                                .chars()
-                                                .count(),
+                                            self.get_current_line_length()?,
                                             self.cursor_x
                                         );
                                     } else {
@@ -255,21 +251,11 @@ impl<H: CustomInput> CoolInput<H> {
                                     self.update_cursor()?;
                                 }
                                 KeyCode::Down => {
-                                    if self.text.lines().count() > 0 {
-                                        if self.cursor_y < self.text.lines().count() - 1 {
+                                    if self.get_amt_lines() > 0 {
+                                        if self.cursor_y < self.get_amt_lines() - 1 {
                                             self.cursor_y += 1;
                                             self.cursor_x = cmp::min(
-                                                self.text
-                                                    .lines()
-                                                    .nth(self.cursor_y)
-                                                    .ok_or_else(||
-                                                        std::io::Error::new(
-                                                            std::io::ErrorKind::Other,
-                                                            "Cursor at invalid position"
-                                                        )
-                                                    )?
-                                                    .chars()
-                                                    .count(),
+                                                self.get_current_line_length()?,
                                                 self.cursor_x
                                             );
                                         } else {
@@ -284,52 +270,18 @@ impl<H: CustomInput> CoolInput<H> {
                                             self.cursor_x -= 1;
                                         } else {
                                             self.cursor_y -= 1;
-                                            self.cursor_x = self.text
-                                                .lines()
-                                                .nth(self.cursor_y)
-                                                .ok_or_else(||
-                                                    std::io::Error::new(
-                                                        std::io::ErrorKind::Other,
-                                                        "Cursor at invalid position"
-                                                    )
-                                                )?
-                                                .chars()
-                                                .count();
+                                            self.cursor_x = self.get_current_line_length()?;
                                         }
                                     }
                                     self.update_cursor()?;
                                 }
                                 KeyCode::Right => {
-                                    if self.text.lines().count() > 0 {
+                                    if self.get_amt_lines() > 0 {
                                         if
-                                            self.cursor_y != self.text.lines().count() - 1 ||
-                                            self.cursor_x <
-                                                self.text
-                                                    .lines()
-                                                    .nth(self.cursor_y)
-                                                    .ok_or_else(||
-                                                        std::io::Error::new(
-                                                            std::io::ErrorKind::Other,
-                                                            "Cursor at invalid position"
-                                                        )
-                                                    )?
-                                                    .chars()
-                                                    .count()
+                                            self.cursor_y != self.get_amt_lines() - 1 ||
+                                            self.cursor_x < self.get_current_line_length()?
                                         {
-                                            if
-                                                self.cursor_x !=
-                                                self.text
-                                                    .lines()
-                                                    .nth(self.cursor_y)
-                                                    .ok_or_else(||
-                                                        std::io::Error::new(
-                                                            std::io::ErrorKind::Other,
-                                                            "Cursor at invalid position"
-                                                        )
-                                                    )?
-                                                    .chars()
-                                                    .count()
-                                            {
+                                            if self.cursor_x != self.get_current_line_length()? {
                                                 self.cursor_x += 1;
                                             } else {
                                                 self.cursor_y += 1;
