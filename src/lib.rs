@@ -323,7 +323,7 @@ impl<H: CustomInput> CoolInput<H> {
         }
         Ok(())
     }
-    pub fn listen(&mut self) -> Result<(), std::io::Error> {
+    pub fn pre_listen(&mut self) -> Result<(), std::io::Error> {
         let terminal_size = self.get_terminal_size()?;
         let (offset_x, offset_y) = self.custom_input.get_offset(
             terminal_size,
@@ -335,14 +335,22 @@ impl<H: CustomInput> CoolInput<H> {
             terminal::Clear(terminal::ClearType::All),
             cursor::MoveTo((self.cursor_x as u16) + offset_x, (self.cursor_y as u16) + offset_y)
         )?;
-        self.render()?;
-        self.listen_quiet()?;
+        Ok(())
+    }
+    pub fn post_listen(&mut self) -> Result<(), std::io::Error> {
         execute!(
             stdout(),
             ResetColor,
             terminal::Clear(terminal::ClearType::All),
             cursor::MoveTo(0, 0)
         )?;
+        Ok(())
+    }
+    pub fn listen(&mut self) -> Result<(), std::io::Error> {
+        self.pre_listen()?;
+        self.render()?;
+        self.listen_quiet()?;
+        self.post_listen()?;
         Ok(())
     }
 }
