@@ -40,6 +40,7 @@ pub struct CoolInput<H: CustomInput> {
     pub text: String,
     pub cursor_x: usize,
     pub cursor_y: usize,
+    pub scroll_y: usize,
     pub listening: bool,
     pub custom_input: H,
 }
@@ -66,6 +67,7 @@ impl<H: CustomInput> CoolInput<H> {
             cursor_x: 0,
             cursor_y: 0,
             listening: false,
+            scroll_y: 0,
             custom_input: handler,
         }
     }
@@ -83,10 +85,9 @@ impl<H: CustomInput> CoolInput<H> {
             self.text.to_string()
         );
         let x = cmp::min((self.cursor_x as u16) + offset_x, offset_x + width);
-        let y = cmp::min(
-            cmp::min((self.cursor_y as u16) + offset_y, offset_y + height - 1),
-            terminal_size.1 - 1
-        );
+        let target_y = (self.cursor_y as u16) + offset_y;
+        let target_y = target_y.checked_sub(self.scroll_y as u16).unwrap_or(0);
+        let y = cmp::min(cmp::min(target_y, offset_y + height - 1), terminal_size.1 - 1);
         execute!(stdout(), cursor::MoveTo(x, y))?;
         Ok(())
     }
@@ -129,7 +130,7 @@ impl<H: CustomInput> CoolInput<H> {
         let mut cur_y = 0;
 
         if x == 0 {
-            self.cursor_y -= 1;
+            self.move_cursor_up()?;
             self.cursor_x = self.get_current_line_length()?;
         } else {
             self.cursor_x -= 1;
@@ -158,21 +159,16 @@ impl<H: CustomInput> CoolInput<H> {
             self.text.to_string()
         );
         self.custom_input.before_draw_text(terminal_size, self.text.to_string());
-        let lines = self.get_amt_lines();
-
-        for y in 0..cmp::min(height + offset_y, terminal_size.1) {
-            let y_line_index = y.checked_sub(offset_y);
-            if y_line_index.is_some() {
-                let y_line_index = y_line_index.unwrap();
-                if y_line_index < (lines as u16) {
-                    let line = self.get_line_at(y_line_index as usize)?;
-                    set_terminal_line(&String::from(line), offset_x as usize, y as usize, true)?;
-                } else {
-                    set_terminal_line("", offset_x as usize, y as usize, true)?;
-                }
+        let offset_y = offset_y as i16;
+        for y in offset_y..offset_y + (height as i16) {
+            let y_line_index = y - offset_y + (self.scroll_y as i16);
+            if y_line_index >= 0 && y_line_index < (self.text.lines().count() as i16) {
+                let line = self.get_line_at(y_line_index as usize)?;
+                set_terminal_line(&line, offset_x as usize, y as usize, true)?;
+            } else {
+                set_terminal_line("", offset_x as usize, y as usize, true)?;
             }
         }
-
         self.custom_input.after_draw_text(terminal_size, self.text.to_string());
         io::stdout().flush()?;
         Ok(())
@@ -181,6 +177,35 @@ impl<H: CustomInput> CoolInput<H> {
         if self.get_amt_lines() > 0 {
             self.cursor_x = self.get_current_line_length()?;
             self.update_cursor()?;
+        }
+        Ok(())
+    }
+    fn move_cursor_up(&mut self) -> Result<(), std::io::Error> {
+        if self.cursor_y > 0 {
+            self.cursor_y -= 1;
+            self.cursor_x = cmp::min(self.get_current_line_length()?, self.cursor_x);
+            if self.cursor_y < self.scroll_y {
+                self.scroll_y -= 1;
+            }
+            self.update_text()?;
+        } else {
+            self.cursor_x = 0;
+        }
+        Ok(())
+    }
+    fn move_cursor_down(&mut self) -> Result<(), std::io::Error> {
+        if self.cursor_y < self.get_amt_lines() - 1 {
+            self.cursor_y += 1;
+            self.cursor_x = cmp::min(self.get_current_line_length()?, self.cursor_x);
+            let text = self.text.to_string();
+            let terminal_size = self.get_terminal_size()?;
+            let input_height = self.custom_input.get_size(terminal_size, text).1;
+            if self.cursor_y >= (input_height as usize) + self.scroll_y {
+                self.scroll_y += 1;
+            }
+            self.update_text()?;
+        } else {
+            self.move_cursor_end()?;
         }
         Ok(())
     }
@@ -219,8 +244,7 @@ impl<H: CustomInput> CoolInput<H> {
                                 }
                                 KeyCode::Enter => {
                                     self.insert_string('\n', self.cursor_x, self.cursor_y);
-                                    self.cursor_x = 0;
-                                    self.cursor_y += 1;
+                                    self.move_cursor_down()?;
                                     self.update_text()?;
                                     self.update_cursor()?;
                                 }
@@ -247,28 +271,12 @@ impl<H: CustomInput> CoolInput<H> {
                                     }
                                 }
                                 KeyCode::Up => {
-                                    if self.cursor_y > 0 {
-                                        self.cursor_y -= 1;
-                                        self.cursor_x = cmp::min(
-                                            self.get_current_line_length()?,
-                                            self.cursor_x
-                                        );
-                                    } else {
-                                        self.cursor_x = 0;
-                                    }
+                                    self.move_cursor_up()?;
                                     self.update_cursor()?;
                                 }
                                 KeyCode::Down => {
                                     if self.get_amt_lines() > 0 {
-                                        if self.cursor_y < self.get_amt_lines() - 1 {
-                                            self.cursor_y += 1;
-                                            self.cursor_x = cmp::min(
-                                                self.get_current_line_length()?,
-                                                self.cursor_x
-                                            );
-                                        } else {
-                                            self.move_cursor_end()?;
-                                        }
+                                        self.move_cursor_down()?;
                                         self.update_cursor()?;
                                     }
                                 }
@@ -281,6 +289,7 @@ impl<H: CustomInput> CoolInput<H> {
                                             self.cursor_x = self.get_current_line_length()?;
                                         }
                                     }
+                                    self.update_text()?;
                                     self.update_cursor()?;
                                 }
                                 KeyCode::Right => {
@@ -295,15 +304,18 @@ impl<H: CustomInput> CoolInput<H> {
                                                 self.cursor_y += 1;
                                                 self.cursor_x = 0;
                                             }
+                                            self.update_text()?;
                                             self.update_cursor()?;
                                         }
                                     }
                                 }
                                 KeyCode::Home => {
                                     self.cursor_x = 0;
+                                    self.update_text()?;
                                     self.update_cursor()?;
                                 }
                                 KeyCode::End => {
+                                    self.update_text()?;
                                     self.move_cursor_end()?;
                                 }
                                 _ => {}
