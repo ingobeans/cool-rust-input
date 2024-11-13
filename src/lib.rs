@@ -44,18 +44,17 @@ pub struct CoolInput<H: CustomInput> {
     pub custom_input: H,
 }
 
-pub fn set_terminal_line(text: &str, x: usize, y: usize) -> Result<(), std::io::Error> {
+pub fn set_terminal_line(
+    text: &str,
+    x: usize,
+    y: usize,
+    overwrite: bool
+) -> Result<(), std::io::Error> {
     execute!(stdout(), cursor::Hide)?;
-    let width = terminal::size()?.0;
-    let pad_amount = ((width as usize) - x).checked_sub(text.len());
-    if pad_amount.is_some() {
-        let pad_amount = pad_amount.unwrap();
-        let text_padded =
-            String::from(" ").repeat(x) + text + &String::from(" ").repeat(pad_amount);
-        print!("\x1b[{};0H{}", y + 1, text_padded);
+    if overwrite {
+        print!("\x1b[{};{}H\x1b[2K{}", y + 1, x + 1, text);
     } else {
-        let text_padded = String::from(" ").repeat(x) + text;
-        print!("\x1b[{};0H{}", y + 1, text_padded);
+        print!("\x1b[{};{}H{}", y + 1, x + 1, text);
     }
     Ok(())
 }
@@ -164,9 +163,9 @@ impl<H: CustomInput> CoolInput<H> {
                 let y_line_index = y_line_index.unwrap();
                 if y_line_index < (lines as u16) {
                     let line = self.get_line_at(y_line_index as usize)?;
-                    set_terminal_line(&String::from(line), offset_x as usize, y as usize)?;
+                    set_terminal_line(&String::from(line), offset_x as usize, y as usize, true)?;
                 } else {
-                    set_terminal_line("", offset_x as usize, y as usize)?;
+                    set_terminal_line("", offset_x as usize, y as usize, true)?;
                 }
             }
         }

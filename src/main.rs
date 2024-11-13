@@ -38,14 +38,16 @@ impl CustomInput for CoolCustomInput {
         set_terminal_line(
             "Welcome to my cool text editor. Here you can write cool stuff!",
             5,
-            0
+            0,
+            true
         ).unwrap();
-        set_terminal_line("Rules:", 5, 1).unwrap();
-        set_terminal_line("None!!", 10, 2).unwrap();
+        set_terminal_line("Rules:", 5, 1, true).unwrap();
+        set_terminal_line("None!!", 10, 2, true).unwrap();
         set_terminal_line(
             &String::from("_").repeat((terminal_size.0 as usize) - 10),
             5,
-            3
+            3,
+            true
         ).unwrap();
     }
     fn get_offset(&mut self, _terminal_size: (u16, u16), _current_text: String) -> (u16, u16) {
