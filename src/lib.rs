@@ -83,7 +83,10 @@ impl<H: CustomInput> CoolInput<H> {
             self.text.to_string()
         );
         let x = cmp::min((self.cursor_x as u16) + offset_x, offset_x + width);
-        let y = cmp::min((self.cursor_y as u16) + offset_y, offset_y + height - 1);
+        let y = cmp::min(
+            cmp::min((self.cursor_y as u16) + offset_y, offset_y + height - 1),
+            terminal_size.1 - 1
+        );
         execute!(stdout(), cursor::MoveTo(x, y))?;
         Ok(())
     }

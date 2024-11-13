@@ -54,7 +54,7 @@ impl CustomInput for CoolCustomInput {
         (5, 5)
     }
     fn get_size(&mut self, terminal_size: (u16, u16), _current_text: String) -> (u16, u16) {
-        (terminal_size.0 - 10, 5)
+        (terminal_size.0 - 10, terminal_size.1)
     }
 }
 
