@@ -244,7 +244,8 @@ impl<H: CustomInput> CoolInput<H> {
                                 }
                                 KeyCode::Enter => {
                                     self.insert_string('\n', self.cursor_x, self.cursor_y);
-                                    self.move_cursor_down()?;
+                                    self.cursor_y += 1;
+                                    self.cursor_x = 0;
                                     self.update_text()?;
                                     self.update_cursor()?;
                                 }
