@@ -260,11 +260,15 @@ impl<H: CustomInput> CoolInput<H> {
                                     if self.get_amt_lines() > 0 {
                                         let line_length = self.get_current_line_length()?;
                                         if
-                                            line_length > 0 &&
-                                            (self.cursor_x < line_length ||
-                                                self.cursor_y != self.get_amt_lines() - 1)
+                                            self.cursor_x < line_length ||
+                                            self.cursor_y != self.get_amt_lines() - 1
                                         {
-                                            self.cursor_x += 1;
+                                            if self.cursor_x == line_length {
+                                                self.cursor_x = 0;
+                                                self.cursor_y += 1;
+                                            } else {
+                                                self.cursor_x += 1;
+                                            }
                                             self.remove_character(self.cursor_x, self.cursor_y)?;
                                             self.update_text()?;
                                             self.update_cursor()?;
