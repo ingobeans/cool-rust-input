@@ -10,3 +10,5 @@ an input crate for fine control over each key press and rendering of text. by de
 * markdown support (to some degree)
 * pgdown/pgup
 * fix linux support
+* ctrl left/right arrow
+* fix delete key not being able to delete newline
