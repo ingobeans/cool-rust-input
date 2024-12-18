@@ -3,3 +3,12 @@
 
 
 an input crate for fine control over each key press and rendering of text. by default allows multiline input, but custom behaviour can be added to make enter submit.
+
+**only seems to properly work on windows.** on my linux machine the arrow keys aren't properly recognised.
+
+## todo:
+* markdown support (to some degree)
+* pgdown/pgup
+* fix linux support
+* ctrl left/right arrow
+* fix delete key not being able to delete newline
