@@ -1,8 +1,12 @@
-use crossterm::event::{ self, Event, KeyCode };
-use crossterm::{ execute, cursor, terminal, style::{ Color, SetForegroundColor, ResetColor } };
-use std::io::{ self, Write, stdout };
-use std::time::Duration;
+use crossterm::event::{self, Event, KeyCode};
+use crossterm::{
+    cursor, execute,
+    style::{Color, ResetColor, SetForegroundColor},
+    terminal,
+};
 use std::cmp;
+use std::io::{self, stdout, Write};
+use std::time::Duration;
 
 pub enum KeyPressResult {
     Handled,
@@ -43,13 +47,14 @@ pub struct CoolInput<H: CustomInput> {
     pub scroll_y: usize,
     pub listening: bool,
     pub custom_input: H,
+    pub tab_width: usize,
 }
 
 pub fn set_terminal_line(
     text: &str,
     x: usize,
     y: usize,
-    overwrite: bool
+    overwrite: bool,
 ) -> Result<(), std::io::Error> {
     execute!(stdout(), cursor::Hide)?;
     if overwrite {
@@ -61,13 +66,14 @@ pub fn set_terminal_line(
 }
 
 impl<H: CustomInput> CoolInput<H> {
-    pub fn new(handler: H) -> Self {
+    pub fn new(handler: H, tab_width: usize) -> Self {
         CoolInput {
             text: String::new(),
             cursor_x: 0,
             cursor_y: 0,
             listening: false,
             scroll_y: 0,
+            tab_width: tab_width,
             custom_input: handler,
         }
     }
@@ -79,15 +85,19 @@ impl<H: CustomInput> CoolInput<H> {
     fn update_cursor(&mut self) -> Result<(), std::io::Error> {
         execute!(stdout(), cursor::Show)?;
         let terminal_size = self.get_terminal_size()?;
-        let (width, height) = self.custom_input.get_size(terminal_size, self.text.to_string());
-        let (offset_x, offset_y) = self.custom_input.get_offset(
-            terminal_size,
-            self.text.to_string()
-        );
+        let (width, height) = self
+            .custom_input
+            .get_size(terminal_size, self.text.to_string());
+        let (offset_x, offset_y) = self
+            .custom_input
+            .get_offset(terminal_size, self.text.to_string());
         let x = cmp::min((self.cursor_x as u16) + offset_x, offset_x + width);
         let target_y = (self.cursor_y as u16) + offset_y;
         let target_y = target_y.checked_sub(self.scroll_y as u16).unwrap_or(0);
-        let y = cmp::min(cmp::min(target_y, offset_y + height - 1), terminal_size.1 - 1);
+        let y = cmp::min(
+            cmp::min(target_y, offset_y + height - 1),
+            terminal_size.1 - 1,
+        );
         execute!(stdout(), cursor::MoveTo(x, y))?;
         Ok(())
     }
@@ -153,12 +163,14 @@ impl<H: CustomInput> CoolInput<H> {
     }
     fn update_text(&mut self) -> Result<(), std::io::Error> {
         let terminal_size = self.get_terminal_size()?;
-        let (_width, height) = self.custom_input.get_size(terminal_size, self.text.to_string());
-        let (offset_x, offset_y) = self.custom_input.get_offset(
-            terminal_size,
-            self.text.to_string()
-        );
-        self.custom_input.before_draw_text(terminal_size, self.text.to_string());
+        let (_width, height) = self
+            .custom_input
+            .get_size(terminal_size, self.text.to_string());
+        let (offset_x, offset_y) = self
+            .custom_input
+            .get_offset(terminal_size, self.text.to_string());
+        self.custom_input
+            .before_draw_text(terminal_size, self.text.to_string());
         let offset_y = offset_y as i16;
         for y in offset_y..offset_y + (height as i16) {
             let y_line_index = y - offset_y + (self.scroll_y as i16);
@@ -169,7 +181,8 @@ impl<H: CustomInput> CoolInput<H> {
                 set_terminal_line("", offset_x as usize, y as usize, true)?;
             }
         }
-        self.custom_input.after_draw_text(terminal_size, self.text.to_string());
+        self.custom_input
+            .after_draw_text(terminal_size, self.text.to_string());
         io::stdout().flush()?;
         Ok(())
     }
@@ -223,7 +236,10 @@ impl<H: CustomInput> CoolInput<H> {
         Ok(self.get_line_at(self.cursor_y)?.chars().count())
     }
     pub fn handle_key_press(&mut self, key: Event) -> Result<(), std::io::Error> {
-        match self.custom_input.handle_key_press(&key, self.text.to_string()) {
+        match self
+            .custom_input
+            .handle_key_press(&key, self.text.to_string())
+        {
             KeyPressResult::Handled => {
                 return Ok(());
             }
@@ -231,105 +247,109 @@ impl<H: CustomInput> CoolInput<H> {
                 self.listening = false;
                 return Ok(());
             }
-            KeyPressResult::Continue => {
-                match key {
-                    Event::Key(key_event) => {
-                        if key_event.kind == crossterm::event::KeyEventKind::Press {
-                            match key_event.code {
-                                KeyCode::Char(c) => {
-                                    self.insert_string(c, self.cursor_x, self.cursor_y);
-                                    self.cursor_x += 1;
+            KeyPressResult::Continue => match key {
+                Event::Key(key_event) => {
+                    if key_event.kind == crossterm::event::KeyEventKind::Press {
+                        match key_event.code {
+                            KeyCode::Char(c) => {
+                                self.insert_string(c, self.cursor_x, self.cursor_y);
+                                self.cursor_x += 1;
+                                self.update_text()?;
+                                self.update_cursor()?;
+                            }
+                            KeyCode::Enter => {
+                                self.insert_string('\n', self.cursor_x, self.cursor_y);
+                                self.cursor_y += 1;
+                                self.cursor_x = 0;
+                                self.update_text()?;
+                                self.update_cursor()?;
+                            }
+                            KeyCode::Backspace => {
+                                if self.cursor_x > 0 || self.cursor_y != 0 {
+                                    self.remove_character(self.cursor_x, self.cursor_y)?;
                                     self.update_text()?;
                                     self.update_cursor()?;
                                 }
-                                KeyCode::Enter => {
-                                    self.insert_string('\n', self.cursor_x, self.cursor_y);
-                                    self.cursor_y += 1;
-                                    self.cursor_x = 0;
-                                    self.update_text()?;
-                                    self.update_cursor()?;
+                            }
+                            KeyCode::Tab => {
+                                for _ in 0..self.tab_width {
+                                    self.insert_string(' ', self.cursor_x, self.cursor_y);
                                 }
-                                KeyCode::Backspace => {
-                                    if self.cursor_x > 0 || self.cursor_y != 0 {
+                                self.cursor_x += self.tab_width;
+                                self.update_text()?;
+                                self.update_cursor()?;
+                            }
+                            KeyCode::Delete => {
+                                if self.get_amt_lines() > 0 {
+                                    let line_length = self.get_current_line_length()?;
+                                    if self.cursor_x < line_length
+                                        || self.cursor_y != self.get_amt_lines() - 1
+                                    {
+                                        if self.cursor_x == line_length {
+                                            self.cursor_x = 0;
+                                            self.cursor_y += 1;
+                                        } else {
+                                            self.cursor_x += 1;
+                                        }
                                         self.remove_character(self.cursor_x, self.cursor_y)?;
                                         self.update_text()?;
                                         self.update_cursor()?;
                                     }
                                 }
-                                KeyCode::Delete => {
-                                    if self.get_amt_lines() > 0 {
-                                        let line_length = self.get_current_line_length()?;
-                                        if
-                                            self.cursor_x < line_length ||
-                                            self.cursor_y != self.get_amt_lines() - 1
-                                        {
-                                            if self.cursor_x == line_length {
-                                                self.cursor_x = 0;
-                                                self.cursor_y += 1;
-                                            } else {
-                                                self.cursor_x += 1;
-                                            }
-                                            self.remove_character(self.cursor_x, self.cursor_y)?;
-                                            self.update_text()?;
-                                            self.update_cursor()?;
-                                        }
-                                    }
-                                }
-                                KeyCode::Up => {
-                                    self.move_cursor_up()?;
+                            }
+                            KeyCode::Up => {
+                                self.move_cursor_up()?;
+                                self.update_cursor()?;
+                            }
+                            KeyCode::Down => {
+                                if self.get_amt_lines() > 0 {
+                                    self.move_cursor_down()?;
                                     self.update_cursor()?;
                                 }
-                                KeyCode::Down => {
-                                    if self.get_amt_lines() > 0 {
-                                        self.move_cursor_down()?;
+                            }
+                            KeyCode::Left => {
+                                if self.cursor_x > 0 || self.cursor_y != 0 {
+                                    if self.cursor_x > 0 {
+                                        self.cursor_x -= 1;
+                                    } else {
+                                        self.cursor_y -= 1;
+                                        self.cursor_x = self.get_current_line_length()?;
+                                    }
+                                }
+                                self.update_text()?;
+                                self.update_cursor()?;
+                            }
+                            KeyCode::Right => {
+                                if self.get_amt_lines() > 0 {
+                                    if self.cursor_y != self.get_amt_lines() - 1
+                                        || self.cursor_x < self.get_current_line_length()?
+                                    {
+                                        if self.cursor_x != self.get_current_line_length()? {
+                                            self.cursor_x += 1;
+                                        } else {
+                                            self.cursor_y += 1;
+                                            self.cursor_x = 0;
+                                        }
+                                        self.update_text()?;
                                         self.update_cursor()?;
                                     }
                                 }
-                                KeyCode::Left => {
-                                    if self.cursor_x > 0 || self.cursor_y != 0 {
-                                        if self.cursor_x > 0 {
-                                            self.cursor_x -= 1;
-                                        } else {
-                                            self.cursor_y -= 1;
-                                            self.cursor_x = self.get_current_line_length()?;
-                                        }
-                                    }
-                                    self.update_text()?;
-                                    self.update_cursor()?;
-                                }
-                                KeyCode::Right => {
-                                    if self.get_amt_lines() > 0 {
-                                        if
-                                            self.cursor_y != self.get_amt_lines() - 1 ||
-                                            self.cursor_x < self.get_current_line_length()?
-                                        {
-                                            if self.cursor_x != self.get_current_line_length()? {
-                                                self.cursor_x += 1;
-                                            } else {
-                                                self.cursor_y += 1;
-                                                self.cursor_x = 0;
-                                            }
-                                            self.update_text()?;
-                                            self.update_cursor()?;
-                                        }
-                                    }
-                                }
-                                KeyCode::Home => {
-                                    self.cursor_x = 0;
-                                    self.update_text()?;
-                                    self.update_cursor()?;
-                                }
-                                KeyCode::End => {
-                                    self.update_text()?;
-                                    self.move_cursor_end()?;
-                                }
-                                _ => {}
                             }
+                            KeyCode::Home => {
+                                self.cursor_x = 0;
+                                self.update_text()?;
+                                self.update_cursor()?;
+                            }
+                            KeyCode::End => {
+                                self.update_text()?;
+                                self.move_cursor_end()?;
+                            }
+                            _ => {}
                         }
                     }
-                    _ => (),
                 }
-            }
+                _ => (),
+            },
         }
         Ok(())
     }
@@ -344,15 +364,17 @@ impl<H: CustomInput> CoolInput<H> {
     }
     pub fn pre_listen(&mut self) -> Result<(), std::io::Error> {
         let terminal_size = self.get_terminal_size()?;
-        let (offset_x, offset_y) = self.custom_input.get_offset(
-            terminal_size,
-            self.text.to_string()
-        );
+        let (offset_x, offset_y) = self
+            .custom_input
+            .get_offset(terminal_size, self.text.to_string());
 
         execute!(
             stdout(),
             terminal::Clear(terminal::ClearType::All),
-            cursor::MoveTo((self.cursor_x as u16) + offset_x, (self.cursor_y as u16) + offset_y)
+            cursor::MoveTo(
+                (self.cursor_x as u16) + offset_x,
+                (self.cursor_y as u16) + offset_y
+            )
         )?;
         Ok(())
     }

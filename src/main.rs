@@ -1,7 +1,10 @@
 #[allow(unused_imports)]
-use cool_rust_input::{ CoolInput, DefaultInput, CustomInput, set_terminal_line, KeyPressResult };
-use crossterm::{ execute, style::{ Color, SetForegroundColor } };
-use crossterm::event::{ Event, KeyCode };
+use cool_rust_input::{set_terminal_line, CoolInput, CustomInput, DefaultInput, KeyPressResult};
+use crossterm::event::{Event, KeyCode};
+use crossterm::{
+    execute,
+    style::{Color, SetForegroundColor},
+};
 use std::io::stdout;
 
 pub struct CoolCustomInput;
@@ -9,7 +12,7 @@ impl CustomInput for CoolCustomInput {
     fn handle_key_press(
         &mut self,
         key: &crossterm::event::Event,
-        _current_text: String
+        _current_text: String,
     ) -> KeyPressResult {
         if let Event::Key(key_event) = key {
             if key_event.kind == crossterm::event::KeyEventKind::Press {
@@ -33,22 +36,27 @@ impl CustomInput for CoolCustomInput {
         println!("\x1b[1;0H    Welcome to my cool text editor. Here you can write cool stuff!");
         println!("\x1b[2;0H    Rules: ");
         println!("\x1b[3;0H        None!!");
-        println!("\x1b[4;0H    {}", String::from("_").repeat((terminal_size.0 as usize) - 10));
+        println!(
+            "\x1b[4;0H    {}",
+            String::from("_").repeat((terminal_size.0 as usize) - 10)
+        );
 
         set_terminal_line(
             "Welcome to my cool text editor. Here you can write cool stuff!",
             5,
             0,
-            true
-        ).unwrap();
+            true,
+        )
+        .unwrap();
         set_terminal_line("Rules:", 5, 1, true).unwrap();
         set_terminal_line("None!!", 10, 2, true).unwrap();
         set_terminal_line(
             &String::from("_").repeat((terminal_size.0 as usize) - 10),
             5,
             3,
-            true
-        ).unwrap();
+            true,
+        )
+        .unwrap();
     }
     fn get_offset(&mut self, _terminal_size: (u16, u16), _current_text: String) -> (u16, u16) {
         (5, 5)
@@ -59,7 +67,7 @@ impl CustomInput for CoolCustomInput {
 }
 
 fn main() {
-    let mut cool_input = CoolInput::new(CoolCustomInput);
+    let mut cool_input = CoolInput::new(CoolCustomInput, 0);
     //let mut cool_input = CoolInput::new(DefaultInput);
     cool_input.listen().unwrap();
 }
