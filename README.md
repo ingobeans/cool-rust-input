@@ -4,7 +4,7 @@
 
 an input crate for fine control over each key press and rendering of text. by default allows multiline input, but custom behaviour can be added to make enter submit.
 
-should work cross platform, tested on windows 11 and arch.
+cross platform, tested on windows 11, arch and termux.
 
 ## todo:
 
