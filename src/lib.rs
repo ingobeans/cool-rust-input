@@ -2,11 +2,10 @@ use crossterm::event::{self, Event, KeyCode};
 use crossterm::{
     cursor, execute,
     style::{Color, ResetColor, SetForegroundColor},
-    terminal,
+    terminal::{self, disable_raw_mode, enable_raw_mode},
 };
 use std::cmp;
 use std::io::{self, stdout, Write};
-use std::time::Duration;
 
 pub enum KeyPressResult {
     Handled,
@@ -356,9 +355,7 @@ impl<H: CustomInput> CoolInput<H> {
     pub fn listen_quiet(&mut self) -> Result<(), std::io::Error> {
         self.listening = true;
         while self.listening {
-            if event::poll(Duration::from_millis(50))? {
-                self.handle_key_press(event::read()?)?;
-            }
+            self.handle_key_press(event::read()?)?;
         }
         Ok(())
     }
@@ -367,7 +364,7 @@ impl<H: CustomInput> CoolInput<H> {
         let (offset_x, offset_y) = self
             .custom_input
             .get_offset(terminal_size, self.text.to_string());
-
+        enable_raw_mode()?;
         execute!(
             stdout(),
             terminal::Clear(terminal::ClearType::All),
@@ -385,6 +382,7 @@ impl<H: CustomInput> CoolInput<H> {
             terminal::Clear(terminal::ClearType::All),
             cursor::MoveTo(0, 0)
         )?;
+        disable_raw_mode()?;
         Ok(())
     }
     pub fn listen(&mut self) -> Result<(), std::io::Error> {
