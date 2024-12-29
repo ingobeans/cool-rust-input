@@ -7,14 +7,20 @@ use crossterm::{
 use std::cmp;
 use std::io::{self, stdout, Write};
 
+/// Returned by [CustomInput's handle_key_press](CustomInput::handle_key_press) to signal how the key event should be handled.
 pub enum KeyPressResult {
+    /// Tells the input that this event has been handled, and shouldn't be further processed.
     Handled,
+    /// Tells the input to stop, like it is finished / submitted.
     Stop,
+    /// Continue handling event as normal.
     Continue,
 }
 
+/// Trait that allows custom implementations / behaviour of an [input](CoolInput)
 #[allow(unused_variables)]
 pub trait CustomInput {
+    /// Called before handling of every key press.
     fn handle_key_press(&mut self, key: &Event, current_text: String) -> KeyPressResult {
         if let Event::Key(key_event) = key {
             if let KeyCode::Esc = key_event.code {
@@ -23,22 +29,28 @@ pub trait CustomInput {
         }
         KeyPressResult::Continue
     }
+    /// Called before the user's text input is drawn. Here you can ex. change color of the inputted text
     fn before_draw_text(&mut self, terminal_size: (u16, u16), current_text: String) {
         let _ = execute!(stdout(), SetForegroundColor(Color::Blue));
     }
+    /// Called after the user's text is drawn. Here you can ex. draw other text like information or a title of the document.
     fn after_draw_text(&mut self, terminal_size: (u16, u16), current_text: String) {
         let _ = execute!(stdout(), ResetColor);
     }
+    /// Called by the parent [input](CoolInput) to get the input area's offset, I.e. where the user will start typing.
     fn get_offset(&mut self, terminal_size: (u16, u16), current_text: String) -> (u16, u16) {
         (0, 0)
     }
+    /// Called by the parent [input](CoolInput) to get the input area's size
     fn get_size(&mut self, terminal_size: (u16, u16), current_text: String) -> (u16, u16) {
         terminal_size
     }
 }
+/// A basic default input handler that implements all default functions of the [CustomInput] trait.
 pub struct DefaultInputHandler;
 impl CustomInput for DefaultInputHandler {}
 
+/// The main input type. Uses a custom input handler (a struct which implements [CustomInput])
 pub struct CoolInput<H: CustomInput> {
     pub text: String,
     pub cursor_x: usize,
@@ -49,6 +61,7 @@ pub struct CoolInput<H: CustomInput> {
     pub tab_width: usize,
 }
 
+/// Helper function to draw text to the screen by a coordinate
 pub fn set_terminal_line(
     text: &str,
     x: usize,
@@ -76,6 +89,7 @@ impl<H: CustomInput> CoolInput<H> {
             custom_input: handler,
         }
     }
+    /// Render all text and update cursor
     pub fn render(&mut self) -> Result<(), std::io::Error> {
         self.update_text()?;
         self.update_cursor()?;
@@ -100,6 +114,7 @@ impl<H: CustomInput> CoolInput<H> {
         execute!(stdout(), cursor::MoveTo(x, y))?;
         Ok(())
     }
+    /// Get the size of the terminal running the program
     pub fn get_terminal_size(&mut self) -> Result<(u16, u16), std::io::Error> {
         let mut terminal_size = terminal::size()?;
         terminal_size.1 -= 1;
@@ -234,6 +249,7 @@ impl<H: CustomInput> CoolInput<H> {
     fn get_current_line_length(&mut self) -> Result<usize, std::io::Error> {
         Ok(self.get_line_at(self.cursor_y)?.chars().count())
     }
+    /// Handle a key event
     pub fn handle_key_press(&mut self, key: Event) -> Result<(), std::io::Error> {
         match self
             .custom_input
@@ -349,6 +365,7 @@ impl<H: CustomInput> CoolInput<H> {
         }
         Ok(())
     }
+    /// Start listening for key presses without preparing the terminal
     pub fn listen_quiet(&mut self) -> Result<(), std::io::Error> {
         self.listening = true;
         while self.listening {
@@ -356,6 +373,7 @@ impl<H: CustomInput> CoolInput<H> {
         }
         Ok(())
     }
+    /// Prepare the terminal for input
     pub fn pre_listen(&mut self) -> Result<(), std::io::Error> {
         let terminal_size = self.get_terminal_size()?;
         let (offset_x, offset_y) = self
@@ -372,6 +390,7 @@ impl<H: CustomInput> CoolInput<H> {
         )?;
         Ok(())
     }
+    /// Restore the terminal after input is finished.
     pub fn post_listen(&mut self) -> Result<(), std::io::Error> {
         execute!(
             stdout(),
@@ -382,6 +401,7 @@ impl<H: CustomInput> CoolInput<H> {
         disable_raw_mode()?;
         Ok(())
     }
+    /// Prepare terminal and start to listen for key presses until finished.
     pub fn listen(&mut self) -> Result<(), std::io::Error> {
         self.pre_listen()?;
         self.render()?;
