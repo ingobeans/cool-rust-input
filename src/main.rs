@@ -33,16 +33,8 @@ impl CustomInput for CoolCustomInput {
     fn before_draw_text(&mut self, _terminal_size: (u16, u16), _current_text: String) {
         let _ = execute!(stdout(), SetForegroundColor(Color::Green));
     }
-    fn after_draw_text(&mut self, terminal_size: (u16, u16), _current_text: String) {
+    fn after_draw_text(&mut self, terminal_size: (u16, u16), current_text: String) {
         let _ = execute!(stdout(), SetForegroundColor(Color::White));
-        println!("\x1b[1;0H    Welcome to my cool text editor. Here you can write cool stuff!");
-        println!("\x1b[2;0H    Rules: ");
-        println!("\x1b[3;0H        None!!");
-        println!(
-            "\x1b[4;0H    {}",
-            String::from("_").repeat((terminal_size.0 as usize) - 10)
-        );
-
         set_terminal_line(
             "Welcome to my cool text editor. Here you can write cool stuff!",
             5,
@@ -52,13 +44,9 @@ impl CustomInput for CoolCustomInput {
         .unwrap();
         set_terminal_line("Rules:", 5, 1, true).unwrap();
         set_terminal_line("None!!", 10, 2, true).unwrap();
-        set_terminal_line(
-            &String::from("_").repeat((terminal_size.0 as usize) - 10),
-            5,
-            3,
-            true,
-        )
-        .unwrap();
+
+        let width = self.get_size(terminal_size, current_text).0;
+        set_terminal_line(&String::from("_").repeat(width as usize), 5, 3, true).unwrap();
     }
     fn get_offset(&mut self, _terminal_size: (u16, u16), _current_text: String) -> (u16, u16) {
         (5, 5)
