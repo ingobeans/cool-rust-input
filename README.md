@@ -1,14 +1,25 @@
 # cool-rust-input
 
-![screenshot from cool-rust-input](https://github.com/user-attachments/assets/ea10d2e0-03bf-44ff-b56a-31476f61c4f8)
+![image](https://github.com/user-attachments/assets/e9c93489-037e-4aaa-a0ab-395db5e8ee68)
 
 an input crate for fine control over each key press and rendering of text. by default allows multiline input, but custom behaviour can be added to make enter submit.
 
 cross platform, tested on windows 11, arch and termux.
 
+## basic code sample
+
+```rust
+use cool_rust_input::{CoolInput, DefaultInputHandler};
+
+fn main() -> Result<(), std::io::Error>{
+	let mut my_input = CoolInput::new(DefaultInputHandler, 0);
+	my_input.listen()?;
+	Ok(())
+}
+```
+
 ## todo:
 
-- markdown support (to some degree)
+- markdown support (to some degree) (maybe)
 - pgdown/pgup
-- ctrl left/right arrow
-- fix delete key not being able to delete newline
+- ctrl + left/right arrow

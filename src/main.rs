@@ -1,5 +1,7 @@
 #[allow(unused_imports)]
-use cool_rust_input::{set_terminal_line, CoolInput, CustomInput, DefaultInput, KeyPressResult};
+use cool_rust_input::{
+    set_terminal_line, CoolInput, CustomInput, DefaultInputHandler, KeyPressResult,
+};
 use crossterm::event::{Event, KeyCode};
 use crossterm::{
     execute,
@@ -68,6 +70,6 @@ impl CustomInput for CoolCustomInput {
 
 fn main() {
     let mut cool_input = CoolInput::new(CoolCustomInput, 0);
-    //let mut cool_input = CoolInput::new(DefaultInput);
+    //let mut cool_input = CoolInput::new(DefaultInputHandler, 0);
     cool_input.listen().unwrap();
 }

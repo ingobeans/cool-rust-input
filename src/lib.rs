@@ -36,8 +36,8 @@ pub trait CustomInput {
         terminal_size
     }
 }
-pub struct DefaultInput;
-impl CustomInput for DefaultInput {}
+pub struct DefaultInputHandler;
+impl CustomInput for DefaultInputHandler {}
 
 pub struct CoolInput<H: CustomInput> {
     pub text: String,
@@ -145,7 +145,7 @@ impl<H: CustomInput> CoolInput<H> {
             self.cursor_x -= 1;
         }
 
-        if self.text.len() > 0 {
+        if !self.text.is_empty() {
             for char in self.text.chars() {
                 cur_x += 1;
                 if char == '\n' {
@@ -246,8 +246,8 @@ impl<H: CustomInput> CoolInput<H> {
                 self.listening = false;
                 return Ok(());
             }
-            KeyPressResult::Continue => match key {
-                Event::Key(key_event) => {
+            KeyPressResult::Continue => {
+                if let Event::Key(key_event) = key {
                     if key_event.kind == crossterm::event::KeyEventKind::Press {
                         match key_event.code {
                             KeyCode::Char(c) => {
@@ -318,20 +318,18 @@ impl<H: CustomInput> CoolInput<H> {
                                 self.update_text()?;
                                 self.update_cursor()?;
                             }
-                            KeyCode::Right => {
-                                if self.get_amt_lines() > 0 {
-                                    if self.cursor_y != self.get_amt_lines() - 1
-                                        || self.cursor_x < self.get_current_line_length()?
-                                    {
-                                        if self.cursor_x != self.get_current_line_length()? {
-                                            self.cursor_x += 1;
-                                        } else {
-                                            self.cursor_y += 1;
-                                            self.cursor_x = 0;
-                                        }
-                                        self.update_text()?;
-                                        self.update_cursor()?;
+                            KeyCode::Right if self.get_amt_lines() > 0 => {
+                                if self.cursor_y != self.get_amt_lines() - 1
+                                    || self.cursor_x < self.get_current_line_length()?
+                                {
+                                    if self.cursor_x != self.get_current_line_length()? {
+                                        self.cursor_x += 1;
+                                    } else {
+                                        self.cursor_y += 1;
+                                        self.cursor_x = 0;
                                     }
+                                    self.update_text()?;
+                                    self.update_cursor()?;
                                 }
                             }
                             KeyCode::Home => {
@@ -347,8 +345,7 @@ impl<H: CustomInput> CoolInput<H> {
                         }
                     }
                 }
-                _ => (),
-            },
+            }
         }
         Ok(())
     }
