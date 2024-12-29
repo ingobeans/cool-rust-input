@@ -10,6 +10,5 @@ cross platform, tested on windows 11, arch and termux.
 
 - markdown support (to some degree)
 - pgdown/pgup
-- fix linux support
 - ctrl left/right arrow
 - fix delete key not being able to delete newline

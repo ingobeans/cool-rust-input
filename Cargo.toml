@@ -2,6 +2,12 @@
 name = "cool-rust-input"
 version = "3.3.1"
 edition = "2021"
+description = "Cross platform customizable multiline input"
+repository = "https://github.com/ingobeans/cool-rust-input"
+readme = "README.md"
+license = "MIT"
+keywords = ["input", "terminal"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 crossterm = "0.28.1"
