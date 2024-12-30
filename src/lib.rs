@@ -235,7 +235,7 @@ impl<H: CustomInput> CoolInput<H> {
     fn move_cursor_up(&mut self) -> Result<(), std::io::Error> {
         if self.cursor_y > 0 {
             self.cursor_y -= 1;
-            let original_x = self.cursor_x.clone();
+            let original_x = self.cursor_x;
             self.cursor_x = cmp::min(self.get_current_line_length()?, self.cursor_x);
             if self.cursor_y < self.scroll_y {
                 self.scroll_y -= 1;
@@ -252,7 +252,7 @@ impl<H: CustomInput> CoolInput<H> {
     fn move_cursor_down(&mut self) -> Result<(), std::io::Error> {
         if self.cursor_y < self.get_amt_lines() - 1 {
             self.cursor_y += 1;
-            let original_x = self.cursor_x.clone();
+            let original_x = self.cursor_x;
             self.cursor_x = cmp::min(self.get_current_line_length()?, self.cursor_x);
             let text = self.text.to_string();
             let terminal_size = self.get_terminal_size()?;
