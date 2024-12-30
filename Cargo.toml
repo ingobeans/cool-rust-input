@@ -1,6 +1,6 @@
 [package]
 name = "cool-rust-input"
-version = "4.2.2"
+version = "4.2.3"
 edition = "2021"
 description = "Cross platform customizable multiline input"
 repository = "https://github.com/ingobeans/cool-rust-input"

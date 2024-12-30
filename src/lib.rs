@@ -57,7 +57,7 @@ fn get_slice_of_string(text: String, start: usize, end: usize) -> String {
             break;
         }
         new_text.insert(
-            new_text.chars().count(),
+            new_text.len(),
             text.chars().nth(i).expect("Char at pos should exist"),
         );
     }
