@@ -1,6 +1,6 @@
 use crossterm::event::{self, Event, KeyCode};
 use crossterm::{
-    cursor, execute,
+    cursor, execute, queue,
     style::{Color, ResetColor, SetForegroundColor},
     terminal::{self, disable_raw_mode, enable_raw_mode},
 };
@@ -31,11 +31,11 @@ pub trait CustomInput {
     }
     /// Called before the user's text input is drawn. Here you can ex. change color of the inputted text
     fn before_draw_text(&mut self, terminal_size: (u16, u16), current_text: String) {
-        let _ = execute!(stdout(), SetForegroundColor(Color::Blue));
+        let _ = queue!(stdout(), SetForegroundColor(Color::Blue));
     }
     /// Called after the user's text is drawn. Here you can ex. draw other text like information or a title of the document.
     fn after_draw_text(&mut self, terminal_size: (u16, u16), current_text: String) {
-        let _ = execute!(stdout(), ResetColor);
+        let _ = queue!(stdout(), ResetColor);
     }
     /// Called by the parent [input](CoolInput) to get the input area's offset, I.e. where the user will start typing.
     fn get_offset(&mut self, terminal_size: (u16, u16), current_text: String) -> (u16, u16) {
@@ -61,7 +61,7 @@ fn get_slice_of_string(text: String, start: usize, end: usize) -> String {
         new_text.insert(
             new_text.chars().count(),
             text.chars()
-                .nth(i as usize)
+                .nth(i)
                 .expect("Char at pos should exist"),
         );
     }
@@ -87,11 +87,16 @@ pub fn set_terminal_line(
     y: usize,
     overwrite: bool,
 ) -> Result<(), std::io::Error> {
-    execute!(stdout(), cursor::Hide)?;
     if overwrite {
-        print!("\x1b[{};{}H\x1b[2K{}", y + 1, x + 1, text);
+        queue!(
+            stdout(),
+            cursor::MoveTo(x as u16, y as u16),
+            terminal::Clear(terminal::ClearType::CurrentLine)
+        )?;
+        print!("{text}");
     } else {
-        print!("\x1b[{};{}H{}", y + 1, x + 1, text);
+        queue!(stdout(), cursor::MoveTo(x as u16, y as u16))?;
+        print!("{text}");
     }
     Ok(())
 }
@@ -105,7 +110,7 @@ impl<H: CustomInput> CoolInput<H> {
             listening: false,
             scroll_x: 0,
             scroll_y: 0,
-            tab_width: tab_width,
+            tab_width,
             custom_input: handler,
         }
     }
@@ -113,10 +118,10 @@ impl<H: CustomInput> CoolInput<H> {
     pub fn render(&mut self) -> Result<(), std::io::Error> {
         self.update_text()?;
         self.update_cursor()?;
+        io::stdout().flush()?;
         Ok(())
     }
     fn update_cursor(&mut self) -> Result<(), std::io::Error> {
-        execute!(stdout(), cursor::Show)?;
         let terminal_size = self.get_terminal_size()?;
         let (width, height) = self
             .custom_input
@@ -125,15 +130,16 @@ impl<H: CustomInput> CoolInput<H> {
             .custom_input
             .get_offset(terminal_size, self.text.to_string());
         let x = self.cursor_x as i16 + offset_x as i16 - self.scroll_x as i16;
-        let x: u16 = cmp::max(x, 0 as i16) as u16;
+        let x: u16 = cmp::max(x, 0_i16) as u16;
         let x = cmp::min(x, offset_x + width);
         let target_y = (self.cursor_y as u16) + offset_y;
-        let target_y = target_y.checked_sub(self.scroll_y as u16).unwrap_or(0);
+        let target_y = target_y.saturating_sub(self.scroll_y as u16);
         let y = cmp::min(
             cmp::min(target_y, offset_y + height - 1),
             terminal_size.1 - 1,
         );
-        execute!(stdout(), cursor::MoveTo(x, y))?;
+        queue!(stdout(), cursor::Show)?;
+        queue!(stdout(), cursor::MoveTo(x, y))?;
         Ok(())
     }
     /// Get the size of the terminal running the program
@@ -221,7 +227,6 @@ impl<H: CustomInput> CoolInput<H> {
         }
         self.custom_input
             .after_draw_text(terminal_size, self.text.to_string());
-        io::stdout().flush()?;
         Ok(())
     }
     fn move_cursor_end(&mut self) -> Result<(), std::io::Error> {
@@ -242,7 +247,7 @@ impl<H: CustomInput> CoolInput<H> {
             }
 
             self.keep_scroll_x_in_view(self.cursor_x >= original_x)?;
-            self.update_text()?;
+            self.render()?;
         } else {
             self.cursor_x = 0;
             self.scroll_x = 0;
@@ -261,7 +266,7 @@ impl<H: CustomInput> CoolInput<H> {
                 self.scroll_y += 1;
             }
             self.keep_scroll_x_in_view(self.cursor_x >= original_x)?;
-            self.update_text()?;
+            self.render()?;
         } else {
             self.move_cursor_end()?;
         }
@@ -288,10 +293,8 @@ impl<H: CustomInput> CoolInput<H> {
             if self.cursor_x > input_width as usize - 1 {
                 self.scroll_x = cmp::max(self.scroll_x, self.cursor_x - input_width as usize + 1);
             }
-        } else {
-            if self.cursor_x < self.scroll_x {
-                self.scroll_x = self.cursor_x;
-            }
+        } else if self.cursor_x < self.scroll_x {
+            self.scroll_x = self.cursor_x;
         }
         Ok(())
     }
@@ -344,22 +347,19 @@ impl<H: CustomInput> CoolInput<H> {
                             KeyCode::Char(c) => {
                                 self.insert_string(c, self.cursor_x, self.cursor_y);
                                 self.move_cursor_right()?;
-                                self.update_text()?;
-                                self.update_cursor()?;
+                                self.render()?;
                             }
                             KeyCode::Enter => {
                                 self.insert_string('\n', self.cursor_x, self.cursor_y);
                                 self.cursor_y += 1;
                                 self.cursor_x = 0;
                                 self.keep_scroll_x_in_view(false)?;
-                                self.update_text()?;
-                                self.update_cursor()?;
+                                self.render()?;
                             }
                             KeyCode::Backspace => {
                                 if self.cursor_x > 0 || self.cursor_y != 0 {
                                     self.remove_character(self.cursor_x, self.cursor_y)?;
-                                    self.update_text()?;
-                                    self.update_cursor()?;
+                                    self.render()?;
                                 }
                             }
                             KeyCode::Tab => {
@@ -367,8 +367,7 @@ impl<H: CustomInput> CoolInput<H> {
                                     self.insert_string(' ', self.cursor_x, self.cursor_y);
                                 }
                                 self.cursor_x += self.tab_width;
-                                self.update_text()?;
-                                self.update_cursor()?;
+                                self.render()?;
                             }
                             KeyCode::Delete => {
                                 if self.get_amt_lines() > 0 {
@@ -383,8 +382,7 @@ impl<H: CustomInput> CoolInput<H> {
                                             self.cursor_x += 1;
                                         }
                                         self.remove_character(self.cursor_x, self.cursor_y)?;
-                                        self.update_text()?;
-                                        self.update_cursor()?;
+                                        self.render()?;
                                     }
                                 }
                             }
@@ -400,24 +398,20 @@ impl<H: CustomInput> CoolInput<H> {
                             }
                             KeyCode::Left => {
                                 self.move_cursor_left()?;
-                                self.update_text()?;
-                                self.update_cursor()?;
+                                self.render()?;
                             }
                             KeyCode::Right if self.get_amt_lines() > 0 => {
                                 self.move_cursor_right()?;
-                                self.update_text()?;
-                                self.update_cursor()?;
+                                self.render()?;
                             }
                             KeyCode::Home => {
                                 self.cursor_x = 0;
                                 self.keep_scroll_x_in_view(false)?;
-                                self.update_text()?;
-                                self.update_cursor()?;
+                                self.render()?;
                             }
                             KeyCode::End => {
                                 self.move_cursor_end()?;
-                                self.update_text()?;
-                                self.update_cursor()?;
+                                self.render()?;
                             }
                             _ => {}
                         }

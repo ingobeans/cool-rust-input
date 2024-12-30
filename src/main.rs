@@ -4,7 +4,7 @@ use cool_rust_input::{
 };
 use crossterm::event::{Event, KeyCode};
 use crossterm::{
-    execute,
+    queue,
     style::{Color, SetForegroundColor},
 };
 use std::io::stdout;
@@ -31,10 +31,10 @@ impl CustomInput for CoolCustomInput {
         KeyPressResult::Continue
     }
     fn before_draw_text(&mut self, _terminal_size: (u16, u16), _current_text: String) {
-        let _ = execute!(stdout(), SetForegroundColor(Color::Green));
+        let _ = queue!(stdout(), SetForegroundColor(Color::Green));
     }
     fn after_draw_text(&mut self, terminal_size: (u16, u16), current_text: String) {
-        let _ = execute!(stdout(), SetForegroundColor(Color::White));
+        let _ = queue!(stdout(), SetForegroundColor(Color::White));
         set_terminal_line(
             "Welcome to my cool text editor. Here you can write cool stuff!",
             5,
