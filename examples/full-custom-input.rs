@@ -15,11 +15,13 @@ impl CustomInput for CoolCustomInput {
     ) -> KeyPressResult {
         if let Event::Key(key_event) = key {
             if key_event.kind == crossterm::event::KeyEventKind::Press {
+                // Make escape stop the input
                 if let KeyCode::Esc = key_event.code {
                     return KeyPressResult::Stop;
                 }
+                // Disallow the user pressing the character 'S'
                 if let KeyCode::Char(c) = key_event.code {
-                    if c == 'q' {
+                    if c == 's' || c == 'S' {
                         return KeyPressResult::Handled;
                     }
                 }
@@ -33,14 +35,14 @@ impl CustomInput for CoolCustomInput {
     fn after_draw_text(&mut self, terminal_size: (u16, u16), current_text: String) {
         let _ = queue!(stdout(), SetForegroundColor(Color::White));
         set_terminal_line(
-            "Welcome to my cool text editor. Here you can write cool stuff!",
+            "Welcome to my cool text editor. Here you can write cool stuff! Press ESC to exit.",
             5,
             0,
             true,
         )
         .unwrap();
         set_terminal_line("Rules:", 5, 1, true).unwrap();
-        set_terminal_line("None!!", 10, 2, true).unwrap();
+        set_terminal_line("No typing the letter S", 10, 2, true).unwrap();
 
         let width = self.get_size(terminal_size, current_text).0;
         set_terminal_line(&String::from("_").repeat(width as usize), 5, 3, true).unwrap();

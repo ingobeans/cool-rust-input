@@ -1,4 +1,4 @@
-use crossterm::event::{self, Event, KeyCode};
+use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use crossterm::{
     cursor, execute, queue,
     style::{Color, ResetColor, SetForegroundColor},
@@ -23,8 +23,16 @@ pub trait CustomInput {
     /// Called before handling of every key press.
     fn handle_key_press(&mut self, key: &Event, current_text: String) -> KeyPressResult {
         if let Event::Key(key_event) = key {
+            // Make pressing Escape stop the input
             if let KeyCode::Esc = key_event.code {
                 return KeyPressResult::Stop;
+            }
+
+            // Make CTRL + C also stop
+            if let KeyCode::Char(c) = key_event.code {
+                if c == 'c' && key_event.modifiers.contains(KeyModifiers::CONTROL) {
+                    return KeyPressResult::Stop;
+                }
             }
         }
         KeyPressResult::Continue
