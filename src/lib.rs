@@ -31,12 +31,10 @@ pub trait CustomInput {
     }
     /// Called before the user's text input is drawn. Here you can ex. change color of the inputted text
     fn before_draw_text(&mut self, terminal_size: (u16, u16), current_text: String) {
-        let _ = queue!(stdout(), SetForegroundColor(Color::Blue));
+        let _ = queue!(stdout(), SetForegroundColor(Color::White));
     }
     /// Called after the user's text is drawn. Here you can ex. draw other text like information or a title of the document.
-    fn after_draw_text(&mut self, terminal_size: (u16, u16), current_text: String) {
-        let _ = queue!(stdout(), ResetColor);
-    }
+    fn after_draw_text(&mut self, terminal_size: (u16, u16), current_text: String) {}
     /// Called by the parent [input](CoolInput) to get the input area's offset, I.e. where the user will start typing.
     fn get_offset(&mut self, terminal_size: (u16, u16), current_text: String) -> (u16, u16) {
         (0, 0)
@@ -60,9 +58,7 @@ fn get_slice_of_string(text: String, start: usize, end: usize) -> String {
         }
         new_text.insert(
             new_text.chars().count(),
-            text.chars()
-                .nth(i)
-                .expect("Char at pos should exist"),
+            text.chars().nth(i).expect("Char at pos should exist"),
         );
     }
     new_text
