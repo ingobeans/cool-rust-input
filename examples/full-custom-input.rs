@@ -8,11 +8,7 @@ use std::io::stdout;
 
 pub struct CoolCustomInput;
 impl CustomInput for CoolCustomInput {
-    fn handle_key_press(
-        &mut self,
-        key: &crossterm::event::Event,
-        _current_text: String,
-    ) -> KeyPressResult {
+    fn handle_key_press(&mut self, key: &Event, _current_text: String) -> KeyPressResult {
         if let Event::Key(key_event) = key {
             if key_event.kind == crossterm::event::KeyEventKind::Press {
                 // Make escape stop the input
