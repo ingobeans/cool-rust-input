@@ -1,4 +1,4 @@
-use cool_rust_input::{set_terminal_line, CoolInput, CustomInput};
+use cool_rust_input::{set_terminal_line, CoolInput, CustomInputHandler, HandlerContext};
 use crossterm::{
     queue,
     style::{Color, SetForegroundColor},
@@ -6,14 +6,14 @@ use crossterm::{
 use std::io::stdout;
 
 struct MyHandler;
-impl CustomInput for MyHandler {
-    fn get_offset(&mut self, _: (u16, u16), _: String) -> (u16, u16) {
+impl CustomInputHandler for MyHandler {
+    fn get_offset(&mut self, _: HandlerContext) -> (u16, u16) {
         (5, 2)
     }
-    fn get_size(&mut self, terminal_size: (u16, u16), _: String) -> (u16, u16) {
-        (terminal_size.0 - 10, terminal_size.1 - 5)
+    fn get_size(&mut self, ctx: HandlerContext) -> (u16, u16) {
+        (ctx.terminal_size.0 - 10, ctx.terminal_size.1 - 5)
     }
-    fn after_draw_text(&mut self, _: (u16, u16), _: String) {
+    fn after_draw_text(&mut self, _: HandlerContext) {
         // we'll use this function to display a title text
 
         let _ = queue!(stdout(), SetForegroundColor(Color::Green));
