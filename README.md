@@ -21,7 +21,9 @@ fn main() -> Result<(), std::io::Error> {
 ## custom handler sample
 
 ```rust
-use cool_rust_input::{set_terminal_line, CoolInput, CustomInputHandler, HandlerContext};
+use cool_rust_input::{
+    set_terminal_line, CoolInput, CustomInputHandler, HandlerContext, InputTransform,
+};
 use crossterm::{
     queue,
     style::{Color, SetForegroundColor},
@@ -30,11 +32,10 @@ use std::io::stdout;
 
 struct MyHandler;
 impl CustomInputHandler for MyHandler {
-    fn get_offset(&mut self, _: HandlerContext) -> (u16, u16) {
-        (5, 2)
-    }
-    fn get_size(&mut self, ctx: HandlerContext) -> (u16, u16) {
-        (ctx.terminal_size.0 - 10, ctx.terminal_size.1 - 5)
+    fn get_input_transform(&mut self, ctx: HandlerContext) -> InputTransform {
+        let size = (ctx.terminal_size.0 - 10, ctx.terminal_size.1 - 2);
+        let offset = (5, 2);
+        InputTransform { size, offset }
     }
     fn after_draw_text(&mut self, _: HandlerContext) {
         // we'll use this function to display a title text

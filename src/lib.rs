@@ -7,7 +7,7 @@ use crossterm::{
 use std::cmp;
 use std::io::{self, stdout, Write};
 
-/// Returned by [CustomInput's handle_key_press](CustomInput::handle_key_press) to signal how the key event should be handled.
+/// Returned by [CustomInputHandler's handle_key_press](CustomInputHandler::handle_key_press) to signal how the key event should be handled.
 pub enum KeyPressResult {
     /// Tells the input that this event has been handled, and shouldn't be further processed.
     Handled,
@@ -17,10 +17,15 @@ pub enum KeyPressResult {
     Continue,
 }
 
-/// Context given to [CustomInput]
+/// Context given to [CustomInputHandler]
 pub struct HandlerContext<'a> {
     pub text_data: &'a mut TextInputData,
     pub terminal_size: &'a (u16, u16),
+}
+
+pub struct InputTransform {
+    pub size: (u16, u16),
+    pub offset: (u16, u16),
 }
 
 /// Trait that allows custom implementations / behaviour of an [input](CoolInput)
@@ -49,16 +54,14 @@ pub trait CustomInputHandler {
     }
     /// Called after the user's text is drawn. Here you can ex. draw other text like information or a title of the document.
     fn after_draw_text(&mut self, ctx: HandlerContext) {}
-    /// Called by the parent [input](CoolInput) to get the input area's offset, I.e. where the user will start typing.
-    fn get_offset(&mut self, ctx: HandlerContext) -> (u16, u16) {
-        (0, 0)
-    }
-    /// Called by the parent [input](CoolInput) to get the input area's size
-    fn get_size(&mut self, ctx: HandlerContext) -> (u16, u16) {
-        *ctx.terminal_size
+    /// Called by the parent [input](CoolInput) to get the input area's size and offset (in a [InputTransform]).
+    fn get_input_transform(&mut self, ctx: HandlerContext) -> InputTransform {
+        let size = *ctx.terminal_size;
+        let offset = (0, 0);
+        InputTransform { size, offset }
     }
 }
-/// A basic default input handler that implements all default functions of the [CustomInput] trait.
+/// A basic default input handler that implements all default functions of the [CustomInputHandler] trait.
 pub struct DefaultInputHandler;
 impl CustomInputHandler for DefaultInputHandler {}
 
@@ -78,6 +81,7 @@ fn get_slice_of_string(text: &str, start: usize, end: usize) -> String {
     new_text
 }
 
+/// Handles key presses, writing text, and moving the cursor
 pub struct TextInputData {
     pub text: String,
     pub cursor_x: usize,
@@ -85,7 +89,7 @@ pub struct TextInputData {
     pub tab_width: usize,
 }
 
-/// The main input type. Uses a custom input handler (a struct which implements [CustomInput])
+/// The main input type. Uses a custom input handler (a struct which implements [CustomInputHandler])
 pub struct CoolInput<H: CustomInputHandler> {
     pub text_data: TextInputData,
     pub scroll_x: usize,
@@ -325,6 +329,16 @@ impl<H: CustomInputHandler> CoolInput<H> {
         terminal_size.1 -= 1;
         Ok(terminal_size)
     }
+    pub fn get_input_transform(&mut self) -> Result<InputTransform, std::io::Error> {
+        let terminal_size = self.get_terminal_size()?;
+        let input_transform = self.custom_input.get_input_transform(HandlerContext {
+            text_data: &mut self.text_data,
+            terminal_size: &terminal_size,
+        });
+        let size = input_transform.size;
+        let offset = input_transform.offset;
+        Ok(InputTransform { size, offset })
+    }
     /// Render all text and update cursor
     pub fn render(&mut self) -> Result<(), std::io::Error> {
         self.update_text()?;
@@ -334,22 +348,19 @@ impl<H: CustomInputHandler> CoolInput<H> {
     }
     fn update_cursor(&mut self) -> Result<(), std::io::Error> {
         let terminal_size = self.get_terminal_size()?;
-        let (width, height) = self.custom_input.get_size(HandlerContext {
-            text_data: &mut self.text_data,
-            terminal_size: &terminal_size,
-        });
-        let (offset_x, offset_y) = self.custom_input.get_offset(HandlerContext {
-            text_data: &mut self.text_data,
-            terminal_size: &terminal_size,
-        });
+        let input_transform = self.get_input_transform()?;
 
-        let x = self.text_data.cursor_x as i16 + offset_x as i16 - self.scroll_x as i16;
+        let x =
+            self.text_data.cursor_x as i16 + input_transform.offset.0 as i16 - self.scroll_x as i16;
         let x: u16 = cmp::max(x, 0_i16) as u16;
-        let x = cmp::min(x, offset_x + width);
-        let target_y = (self.text_data.cursor_y as u16) + offset_y;
+        let x = cmp::min(x, input_transform.offset.0 + input_transform.size.0);
+        let target_y = (self.text_data.cursor_y as u16) + input_transform.offset.1;
         let target_y = target_y.saturating_sub(self.scroll_y as u16);
         let y = cmp::min(
-            cmp::min(target_y, offset_y + height - 1),
+            cmp::min(
+                target_y,
+                input_transform.offset.1 + input_transform.size.1 - 1,
+            ),
             terminal_size.1 - 1,
         );
         queue!(stdout(), cursor::Show)?;
@@ -358,29 +369,25 @@ impl<H: CustomInputHandler> CoolInput<H> {
     }
     fn update_text(&mut self) -> Result<(), std::io::Error> {
         let terminal_size = self.get_terminal_size()?;
-        let (width, height) = self.custom_input.get_size(HandlerContext {
-            text_data: &mut self.text_data,
-            terminal_size: &terminal_size,
-        });
-        let (offset_x, offset_y) = self.custom_input.get_offset(HandlerContext {
-            text_data: &mut self.text_data,
-            terminal_size: &terminal_size,
-        });
+        let input_transform = self.get_input_transform()?;
         self.custom_input.before_draw_text(HandlerContext {
             text_data: &mut self.text_data,
             terminal_size: &terminal_size,
         });
-        let offset_y = offset_y as i16;
-        for y in offset_y..offset_y + (height as i16) {
+        let offset_y = input_transform.offset.1 as i16;
+        for y in offset_y..offset_y + (input_transform.size.1 as i16) {
             let y_line_index = y - offset_y + (self.scroll_y as i16);
             if y_line_index >= 0 && y_line_index < (self.text_data.text.lines().count() as i16) {
                 if let Some(line) = self.text_data.get_line_at(y_line_index as usize) {
-                    let text =
-                        get_slice_of_string(line, self.scroll_x, self.scroll_x + width as usize);
-                    set_terminal_line(&text, offset_x as usize, y as usize, true)?;
+                    let text = get_slice_of_string(
+                        line,
+                        self.scroll_x,
+                        self.scroll_x + input_transform.size.0 as usize,
+                    );
+                    set_terminal_line(&text, input_transform.offset.0 as usize, y as usize, true)?;
                 }
             } else {
-                set_terminal_line("", offset_x as usize, y as usize, true)?;
+                set_terminal_line("", input_transform.offset.0 as usize, y as usize, true)?;
             }
         }
         self.custom_input.after_draw_text(HandlerContext {
@@ -394,21 +401,17 @@ impl<H: CustomInputHandler> CoolInput<H> {
         moving_right: bool,
         moving_down: bool,
     ) -> Result<(), std::io::Error> {
-        let terminal_size = self.get_terminal_size()?;
-        let input_size = self.custom_input.get_size(HandlerContext {
-            text_data: &mut self.text_data,
-            terminal_size: &terminal_size,
-        });
+        let input_transform = self.get_input_transform()?;
         self.scroll_x = self.keep_scroll_axis_in_view(
             self.scroll_x,
             self.text_data.cursor_x,
-            input_size.0 as usize,
+            input_transform.size.0 as usize,
             moving_right,
         )?;
         self.scroll_y = self.keep_scroll_axis_in_view(
             self.scroll_y,
             self.text_data.cursor_y,
-            input_size.1 as usize,
+            input_transform.size.1 as usize,
             moving_down,
         )?;
         Ok(())
@@ -479,18 +482,14 @@ impl<H: CustomInputHandler> CoolInput<H> {
     }
     /// Prepare the terminal for input
     pub fn pre_listen(&mut self) -> Result<(), std::io::Error> {
-        let terminal_size = self.get_terminal_size()?;
-        let (offset_x, offset_y) = self.custom_input.get_offset(HandlerContext {
-            text_data: &mut self.text_data,
-            terminal_size: &terminal_size,
-        });
+        let input_transform = self.get_input_transform()?;
         enable_raw_mode()?;
         execute!(
             stdout(),
             terminal::Clear(terminal::ClearType::All),
             cursor::MoveTo(
-                (self.text_data.cursor_x as u16) + offset_x,
-                (self.text_data.cursor_y as u16) + offset_y
+                (self.text_data.cursor_x as u16) + input_transform.offset.0,
+                (self.text_data.cursor_y as u16) + input_transform.offset.1
             )
         )?;
         Ok(())

@@ -1,7 +1,8 @@
 // https://github.com/ingobeans/banano
 
 use cool_rust_input::{
-    set_terminal_line, CoolInput, CustomInputHandler, HandlerContext, KeyPressResult,
+    set_terminal_line, CoolInput, CustomInputHandler, HandlerContext, InputTransform,
+    KeyPressResult,
 };
 use crossterm::event::{Event, KeyCode, KeyModifiers};
 use crossterm::style::{ResetColor, SetBackgroundColor};
@@ -69,7 +70,7 @@ impl CustomInputHandler for FileEditorInput {
         }
 
         let bottom_text_position = (ctx.terminal_size.1 - 1) as usize;
-        let width = self.get_size(ctx).0;
+        let width = self.get_input_transform(ctx).size.0;
 
         let _ = set_terminal_line(&left_text, 0, 0, true);
         let _ = set_terminal_line(
@@ -83,11 +84,10 @@ impl CustomInputHandler for FileEditorInput {
         let _ = queue!(stdout(), ResetColor);
         let _ = set_terminal_line(bottom_text, 0, bottom_text_position, true);
     }
-    fn get_offset(&mut self, _: HandlerContext) -> (u16, u16) {
-        (0, 2)
-    }
-    fn get_size(&mut self, ctx: HandlerContext) -> (u16, u16) {
-        (ctx.terminal_size.0, ctx.terminal_size.1 - 3)
+    fn get_input_transform(&mut self, ctx: HandlerContext) -> InputTransform {
+        let size = (ctx.terminal_size.0, ctx.terminal_size.1 - 3);
+        let offset = (0, 2);
+        InputTransform { size, offset }
     }
 }
 

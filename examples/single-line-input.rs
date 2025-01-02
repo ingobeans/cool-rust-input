@@ -1,5 +1,6 @@
 use cool_rust_input::{
-    set_terminal_line, CoolInput, CustomInputHandler, HandlerContext, KeyPressResult,
+    set_terminal_line, CoolInput, CustomInputHandler, HandlerContext, InputTransform,
+    KeyPressResult,
 };
 use crossterm::{
     event::{Event, KeyCode},
@@ -10,11 +11,10 @@ use std::io::stdout;
 
 struct MyHandler;
 impl CustomInputHandler for MyHandler {
-    fn get_offset(&mut self, _: HandlerContext) -> (u16, u16) {
-        (1, 2)
-    }
-    fn get_size(&mut self, ctx: HandlerContext) -> (u16, u16) {
-        (ctx.terminal_size.0 - 1, ctx.terminal_size.1 - 2)
+    fn get_input_transform(&mut self, ctx: HandlerContext) -> InputTransform {
+        let size = (ctx.terminal_size.0 - 1, ctx.terminal_size.1 - 2);
+        let offset = (1, 2);
+        InputTransform { size, offset }
     }
     fn after_draw_text(&mut self, _: HandlerContext) {
         // we'll use this function to display a title text

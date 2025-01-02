@@ -1,5 +1,6 @@
 use cool_rust_input::{
-    set_terminal_line, CoolInput, CustomInputHandler, HandlerContext, KeyPressResult,
+    set_terminal_line, CoolInput, CustomInputHandler, HandlerContext, InputTransform,
+    KeyPressResult,
 };
 use crossterm::event::{Event, KeyCode};
 use crossterm::{
@@ -41,14 +42,13 @@ impl CustomInputHandler for CoolCustomInput {
         let _ = set_terminal_line("Rules:", 5, 1, true);
         let _ = set_terminal_line("No typing the letter S", 10, 2, true);
 
-        let width = self.get_size(ctx).0;
+        let width = self.get_input_transform(ctx).size.0;
         let _ = set_terminal_line(&String::from("_").repeat(width as usize), 5, 3, true);
     }
-    fn get_offset(&mut self, _: HandlerContext) -> (u16, u16) {
-        (5, 5)
-    }
-    fn get_size(&mut self, ctx: HandlerContext) -> (u16, u16) {
-        (ctx.terminal_size.0 - 10, ctx.terminal_size.1 - 5)
+    fn get_input_transform(&mut self, ctx: HandlerContext) -> InputTransform {
+        let size = (ctx.terminal_size.0 - 10, ctx.terminal_size.1 - 5);
+        let offset = (5, 5);
+        InputTransform { size, offset }
     }
 }
 
