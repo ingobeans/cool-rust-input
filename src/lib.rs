@@ -1,7 +1,7 @@
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::{
     cursor, execute, queue,
-    style::{Color, ResetColor, SetForegroundColor},
+    style::ResetColor,
     terminal::{self, disable_raw_mode, enable_raw_mode},
 };
 use std::cmp;
@@ -45,7 +45,7 @@ pub trait CustomInputHandler {
     }
     /// Called before the user's text input is drawn. Here you can ex. change color of the inputted text
     fn before_draw_text(&mut self, ctx: HandlerContext) {
-        let _ = queue!(stdout(), SetForegroundColor(Color::White));
+        let _ = queue!(stdout(), ResetColor);
     }
     /// Called after the user's text is drawn. Here you can ex. draw other text like information or a title of the document.
     fn after_draw_text(&mut self, ctx: HandlerContext) {}
@@ -227,6 +227,11 @@ impl TextInputData {
         amt
     }
     pub fn get_line_at(&mut self, y: usize) -> Option<&str> {
+        if self.text.ends_with("\n") {
+            if y == self.text.lines().count() {
+                return Some("");
+            }
+        }
         self.text.lines().nth(y)
     }
     pub fn get_current_line_length(&mut self) -> Result<usize, std::io::Error> {
