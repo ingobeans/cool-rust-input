@@ -227,10 +227,8 @@ impl TextInputData {
         amt
     }
     pub fn get_line_at(&mut self, y: usize) -> Option<&str> {
-        if self.text.ends_with("\n") {
-            if y == self.text.lines().count() {
-                return Some("");
-            }
+        if self.text.ends_with("\n") && y == self.text.lines().count() {
+            return Some("");
         }
         self.text.lines().nth(y)
     }
