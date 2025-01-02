@@ -129,7 +129,6 @@ impl TextInputData {
         if x == 0 && y == 0 {
             self.text.insert(0, c);
         } else {
-            let mut found = false;
             for char in self.text.chars() {
                 cur_x += 1;
                 if char == '\n' {
@@ -139,12 +138,7 @@ impl TextInputData {
                 new.insert(new.len(), char);
                 if cur_x == x && cur_y == y {
                     new.insert(new.len(), c);
-                    found = true;
                 }
-            }
-            if !found {
-                println!("{}, {}", x, y);
-                std::process::exit(1);
             }
             self.text = new;
         }
