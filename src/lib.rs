@@ -336,8 +336,14 @@ impl<H: CustomInputHandler> CoolInput<H> {
             text_data: &mut self.text_data,
             terminal_size: &terminal_size,
         });
-        let size = input_transform.size;
+        let mut size = input_transform.size;
         let offset = input_transform.offset;
+        if size.0 + offset.0 > terminal_size.0 {
+            size.0 = terminal_size.0.saturating_sub(offset.0);
+        }
+        if size.1 + offset.1 > terminal_size.1 {
+            size.1 = terminal_size.1.saturating_sub(offset.1);
+        }
         Ok(InputTransform { size, offset })
     }
     /// Render all text and update cursor
