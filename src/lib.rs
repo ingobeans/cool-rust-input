@@ -23,6 +23,7 @@ pub struct HandlerContext<'a> {
     pub terminal_size: &'a (u16, u16),
 }
 
+/// Struct for size and offset of an [input](CoolInput)
 pub struct InputTransform {
     pub size: (u16, u16),
     pub offset: (u16, u16),
