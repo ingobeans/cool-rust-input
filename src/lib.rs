@@ -1,4 +1,4 @@
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use crossterm::{
     cursor, execute, queue,
     style::ResetColor,
@@ -77,15 +77,17 @@ pub trait CustomInputHandler {
     /// Called before handling of every key press.
     fn handle_key_press(&mut self, key: &Event, ctx: HandlerContext) -> KeyPressResult {
         if let Event::Key(key_event) = key {
-            // Make pressing Escape stop the input
-            if let KeyCode::Esc = key_event.code {
-                return KeyPressResult::Stop;
-            }
-
-            // Make CTRL + C also stop
-            if let KeyCode::Char(c) = key_event.code {
-                if c == 'c' && key_event.modifiers.contains(KeyModifiers::CONTROL) {
+            if key_event.kind == KeyEventKind::Press {
+                // Make pressing Escape stop the input
+                if let KeyCode::Esc = key_event.code {
                     return KeyPressResult::Stop;
+                }
+
+                // Make CTRL + C also stop
+                if let KeyCode::Char(c) = key_event.code {
+                    if c == 'c' && key_event.modifiers.contains(KeyModifiers::CONTROL) {
+                        return KeyPressResult::Stop;
+                    }
                 }
             }
         }
@@ -468,7 +470,7 @@ impl<H: CustomInputHandler> CoolInput<H> {
             }
             KeyPressResult::Continue => {
                 if let Event::Key(key_event) = key {
-                    if key_event.kind == crossterm::event::KeyEventKind::Press {
+                    if key_event.kind == KeyEventKind::Press {
                         self.text_data.handle_key_press(key_event)?;
                         self.scroll_in_view(
                             self.text_data.cursor_x > old_cursor_x,
