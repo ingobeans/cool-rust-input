@@ -7,6 +7,48 @@ use crossterm::{
 use std::cmp;
 use std::io::{self, stdout, Write};
 
+// Get slice of string by starting character index and end character index
+fn get_slice_of_string(text: &str, start: usize, end: usize) -> String {
+    let mut new_text = String::new();
+    let length = text.chars().count();
+
+    for i in start..end {
+        if i >= length {
+            break;
+        }
+        new_text.insert(
+            new_text.len(),
+            text.chars().nth(i).expect("Char at pos should exist"),
+        );
+    }
+    new_text
+}
+
+/// Helper function to draw text to the screen by a coordinate
+pub fn set_terminal_line(
+    text: &str,
+    x: usize,
+    y: usize,
+    overwrite: bool,
+) -> Result<(), std::io::Error> {
+    if overwrite {
+        queue!(
+            stdout(),
+            cursor::MoveTo(x as u16, y as u16),
+            terminal::Clear(terminal::ClearType::CurrentLine)
+        )?;
+        print!("{text}");
+    } else {
+        queue!(stdout(), cursor::MoveTo(x as u16, y as u16))?;
+        print!("{text}");
+    }
+    Ok(())
+}
+
+/// A basic default input handler that implements all default functions of the [CustomInputHandler] trait.
+pub struct DefaultInputHandler;
+impl CustomInputHandler for DefaultInputHandler {}
+
 /// Returned by [CustomInputHandler's handle_key_press](CustomInputHandler::handle_key_press) to signal how the key event should be handled.
 pub enum KeyPressResult {
     /// Tells the input that this event has been handled, and shouldn't be further processed.
@@ -62,25 +104,6 @@ pub trait CustomInputHandler {
         InputTransform { size, offset }
     }
 }
-/// A basic default input handler that implements all default functions of the [CustomInputHandler] trait.
-pub struct DefaultInputHandler;
-impl CustomInputHandler for DefaultInputHandler {}
-
-fn get_slice_of_string(text: &str, start: usize, end: usize) -> String {
-    let mut new_text = String::new();
-    let length = text.chars().count();
-
-    for i in start..end {
-        if i >= length {
-            break;
-        }
-        new_text.insert(
-            new_text.len(),
-            text.chars().nth(i).expect("Char at pos should exist"),
-        );
-    }
-    new_text
-}
 
 /// Handles key presses, writing text, and moving the cursor
 pub struct TextInputData {
@@ -97,27 +120,6 @@ pub struct CoolInput<H: CustomInputHandler> {
     pub scroll_y: usize,
     pub listening: bool,
     pub custom_input: H,
-}
-
-/// Helper function to draw text to the screen by a coordinate
-pub fn set_terminal_line(
-    text: &str,
-    x: usize,
-    y: usize,
-    overwrite: bool,
-) -> Result<(), std::io::Error> {
-    if overwrite {
-        queue!(
-            stdout(),
-            cursor::MoveTo(x as u16, y as u16),
-            terminal::Clear(terminal::ClearType::CurrentLine)
-        )?;
-        print!("{text}");
-    } else {
-        queue!(stdout(), cursor::MoveTo(x as u16, y as u16))?;
-        print!("{text}");
-    }
-    Ok(())
 }
 
 impl TextInputData {
