@@ -4,7 +4,8 @@ use cool_rust_input::{
     set_terminal_line, CoolInput, CustomInputHandler, HandlerContext, InputTransform,
     KeyPressResult,
 };
-use crossterm::event::{Event, KeyCode, KeyModifiers};
+use crossterm::cursor;
+use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers};
 use crossterm::style::{ResetColor, SetBackgroundColor};
 use crossterm::{
     queue,
@@ -14,6 +15,9 @@ use std::env;
 use std::fs;
 use std::io::stdout;
 
+fn save_file(filename: &str, text: &str) {
+    fs::write(filename, text).expect("Unable to write new contents.");
+}
 pub struct FileEditorInput {
     pub filename: String,
     original_text: String,
@@ -39,8 +43,7 @@ impl CustomInputHandler for FileEditorInput {
                             return KeyPressResult::Stop;
                         }
                         if c == 's' {
-                            fs::write(&self.filename, &ctx.text_data.text)
-                                .expect("Unable to write new contents.");
+                            save_file(&self.filename, &ctx.text_data.text);
                             self.is_new = false;
                             self.original_text = ctx.text_data.text.to_owned();
                             return KeyPressResult::Handled;
@@ -60,7 +63,6 @@ impl CustomInputHandler for FileEditorInput {
         let left_text = format!("BANANO v{}", env!("CARGO_PKG_VERSION"));
         let center_text = format!("FILE: '{}'", self.filename);
         let mut right_text = "NOT MODIFIED";
-        let bottom_text = "^S Save File  ^C Exit";
 
         if self.original_text != ctx.text_data.text {
             right_text = "MODIFIED";
@@ -81,8 +83,22 @@ impl CustomInputHandler for FileEditorInput {
         );
         let _ = set_terminal_line(right_text, width as usize - right_text.len(), 0, false);
 
-        let _ = queue!(stdout(), ResetColor);
-        let _ = set_terminal_line(bottom_text, 0, bottom_text_position, true);
+        let keybinds = ["^S".to_string(), "^C".to_string()];
+        let descriptions = ["Save File".to_string(), "Exit".to_string()];
+
+        let mut offset = 0;
+        for (keybind, description) in keybinds.iter().zip(descriptions) {
+            let _ = queue!(
+                stdout(),
+                SetForegroundColor(Color::Black),
+                SetBackgroundColor(Color::White)
+            );
+            let _ = set_terminal_line(keybind, offset, bottom_text_position, false);
+            offset += keybind.chars().count() + 1;
+            let _ = queue!(stdout(), ResetColor);
+            let _ = set_terminal_line(&description, offset, bottom_text_position, false);
+            offset += description.chars().count() + 1;
+        }
     }
     fn get_input_transform(&mut self, ctx: HandlerContext) -> InputTransform {
         let size = (ctx.terminal_size.0, ctx.terminal_size.1 - 3);
@@ -93,6 +109,54 @@ impl CustomInputHandler for FileEditorInput {
 
 pub fn path_exists(path: &str) -> bool {
     fs::metadata(path).is_ok()
+}
+
+/// A simple Y/N prompt input handler. Automatically stops on first keypress, no enter required.
+pub struct ConfirmationInputHandler {
+    pub prompt: String,
+    pub value: bool,
+}
+impl ConfirmationInputHandler {
+    pub fn prompt(prompt: &str) -> Result<bool, std::io::Error> {
+        let handler = ConfirmationInputHandler {
+            prompt: prompt.to_string(),
+            value: false,
+        };
+        let mut input = CoolInput::new(handler, 0);
+        input.listen()?;
+        Ok(input.custom_input.value)
+    }
+}
+impl CustomInputHandler for ConfirmationInputHandler {
+    fn get_input_transform(&mut self, ctx: HandlerContext) -> InputTransform {
+        let prompt_offset = self.prompt.chars().count() as u16;
+        InputTransform {
+            size: (ctx.terminal_size.0 - prompt_offset, ctx.terminal_size.1),
+            offset: (prompt_offset, 0),
+        }
+    }
+    fn after_update_cursor(&mut self, _: HandlerContext) {
+        let _ = queue!(stdout(), cursor::Hide);
+    }
+    fn after_draw_text(&mut self, _: HandlerContext) {
+        let _ = set_terminal_line(&self.prompt, 0, 0, false);
+    }
+    fn handle_key_press(&mut self, key: &Event, _: HandlerContext) -> KeyPressResult {
+        if let Event::Key(key_event) = key {
+            if key_event.kind == KeyEventKind::Press {
+                // Make CTRL + C stop
+                if let KeyCode::Char(c) = key_event.code {
+                    if c == 'c' && key_event.modifiers.contains(KeyModifiers::CONTROL) {
+                        return KeyPressResult::Stop;
+                    } else if c == 'y' || c == 'n' {
+                        self.value = c == 'y';
+                        return KeyPressResult::Stop;
+                    }
+                }
+            }
+        }
+        KeyPressResult::Handled
+    }
 }
 
 fn main() -> Result<(), std::io::Error> {
@@ -114,5 +178,11 @@ fn main() -> Result<(), std::io::Error> {
     );
     cool_input.text_data.text = text;
     cool_input.listen()?;
+    if cool_input.custom_input.original_text != cool_input.text_data.text {
+        let save = ConfirmationInputHandler::prompt("Save file? [y/n]").unwrap();
+        if save {
+            save_file(filename, &cool_input.text_data.text);
+        }
+    }
     Ok(())
 }

@@ -99,6 +99,8 @@ pub trait CustomInputHandler {
     }
     /// Called after the user's text is drawn. Here you can ex. draw other text like information or a title of the document.
     fn after_draw_text(&mut self, ctx: HandlerContext) {}
+    /// Called after the cursor is updated/drawn. Here you can ex. disable cursor blinking or hide it all together
+    fn after_update_cursor(&mut self, ctx: HandlerContext) {}
     /// Called by the parent [input](CoolInput) to get the input area's size and offset (in a [InputTransform]).
     fn get_input_transform(&mut self, ctx: HandlerContext) -> InputTransform {
         let size = *ctx.terminal_size;
@@ -376,15 +378,22 @@ impl<H: CustomInputHandler> CoolInput<H> {
         );
         queue!(stdout(), cursor::Show)?;
         queue!(stdout(), cursor::MoveTo(x, y))?;
+
+        self.custom_input.after_update_cursor(HandlerContext {
+            text_data: &mut self.text_data,
+            terminal_size: &terminal_size,
+        });
         Ok(())
     }
     fn update_text(&mut self) -> Result<(), std::io::Error> {
         let terminal_size = self.get_terminal_size()?;
         let input_transform = self.get_input_transform()?;
+
         self.custom_input.before_draw_text(HandlerContext {
             text_data: &mut self.text_data,
             terminal_size: &terminal_size,
         });
+
         let offset_y = input_transform.offset.1 as i16;
         for y in offset_y..offset_y + (input_transform.size.1 as i16) {
             let y_line_index = y - offset_y + (self.scroll_y as i16);
@@ -401,10 +410,12 @@ impl<H: CustomInputHandler> CoolInput<H> {
                 set_terminal_line("", input_transform.offset.0 as usize, y as usize, true)?;
             }
         }
+
         self.custom_input.after_draw_text(HandlerContext {
             text_data: &mut self.text_data,
             terminal_size: &terminal_size,
         });
+
         Ok(())
     }
     fn scroll_in_view(
@@ -511,7 +522,8 @@ impl<H: CustomInputHandler> CoolInput<H> {
             stdout(),
             ResetColor,
             terminal::Clear(terminal::ClearType::All),
-            cursor::MoveTo(0, 0)
+            cursor::MoveTo(0, 0),
+            cursor::Show,
         )?;
         disable_raw_mode()?;
         Ok(())
