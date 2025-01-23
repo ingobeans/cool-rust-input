@@ -36,12 +36,13 @@ impl CustomInputHandler for FileEditorInput {
     fn handle_key_press(&mut self, key: &Event, ctx: HandlerContext) -> KeyPressResult {
         if let Event::Key(key_event) = key {
             if key_event.kind == crossterm::event::KeyEventKind::Press {
-                // Disallow the user pressing the character 'S'
                 if let KeyCode::Char(c) = key_event.code {
                     if key_event.modifiers.contains(KeyModifiers::CONTROL) {
+                        // exit on CTRL + C
                         if c == 'c' {
                             return KeyPressResult::Stop;
                         }
+                        // save on CTRL + S
                         if c == 's' {
                             save_file(&self.filename, &ctx.text_data.text);
                             self.is_new = false;
