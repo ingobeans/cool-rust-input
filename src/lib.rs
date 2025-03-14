@@ -1,4 +1,7 @@
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::event::{
+    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind,
+    KeyModifiers, MouseEventKind,
+};
 use crossterm::{
     cursor, execute, queue,
     style::ResetColor,
@@ -331,7 +334,7 @@ impl<H: CustomInputHandler> CoolInput<H> {
         }
     }
     /// Get the size of the terminal running the program
-    pub fn get_terminal_size(&mut self) -> Result<(u16, u16), std::io::Error> {
+    pub fn get_terminal_size(&self) -> Result<(u16, u16), std::io::Error> {
         let mut terminal_size = terminal::size()?;
         terminal_size.1 -= 1;
         Ok(terminal_size)
@@ -360,6 +363,10 @@ impl<H: CustomInputHandler> CoolInput<H> {
         Ok(())
     }
     fn update_cursor(&mut self) -> Result<(), std::io::Error> {
+        if !self.cursor_within_screen()? {
+            queue!(stdout(), cursor::Hide)?;
+            return Ok(());
+        }
         let terminal_size = self.get_terminal_size()?;
         let input_transform = self.get_input_transform()?;
 
@@ -429,23 +436,22 @@ impl<H: CustomInputHandler> CoolInput<H> {
             self.text_data.cursor_x,
             input_transform.size.0 as usize,
             moving_right,
-        )?;
+        );
         self.scroll_y = self.keep_scroll_axis_in_view(
             self.scroll_y,
             self.text_data.cursor_y,
             input_transform.size.1 as usize,
             moving_down,
-        )?;
+        );
         Ok(())
     }
     fn keep_scroll_axis_in_view(
         &mut self,
-        scroll_amt: usize,
+        mut scroll_amt: usize,
         cursor_pos: usize,
         bounds: usize,
         moving_direction: bool,
-    ) -> Result<usize, std::io::Error> {
-        let mut scroll_amt = scroll_amt;
+    ) -> usize {
         if moving_direction {
             if cursor_pos > bounds - 1 {
                 scroll_amt = cmp::max(scroll_amt, cursor_pos - bounds + 1);
@@ -453,15 +459,28 @@ impl<H: CustomInputHandler> CoolInput<H> {
         } else if cursor_pos < scroll_amt {
             scroll_amt = cursor_pos;
         }
-        Ok(scroll_amt)
+        scroll_amt
     }
-    /// Handle a key event
-    pub fn handle_key_press(&mut self, key: Event) -> Result<(), std::io::Error> {
+    pub fn cursor_within_screen(&mut self) -> Result<bool, std::io::Error> {
+        let input_transform = self.get_input_transform()?;
+        let height = input_transform.size.1;
+
+        let screen_starts_y = self.scroll_y;
+        let screen_ends_y = self.scroll_y + height as usize;
+
+        let cursor_pos_y = self.text_data.cursor_y;
+
+        let show = screen_starts_y <= cursor_pos_y && cursor_pos_y < screen_ends_y;
+
+        Ok(show)
+    }
+    /// Handle an event
+    pub fn handle_event(&mut self, event: Event) -> Result<(), std::io::Error> {
         let terminal_size = self.get_terminal_size()?;
         let old_cursor_x = self.text_data.cursor_x;
         let old_cursor_y = self.text_data.cursor_y;
         match self.custom_input.handle_key_press(
-            &key,
+            &event,
             HandlerContext {
                 text_data: &mut self.text_data,
                 terminal_size: &terminal_size,
@@ -479,8 +498,8 @@ impl<H: CustomInputHandler> CoolInput<H> {
                 self.listening = false;
                 return Ok(());
             }
-            KeyPressResult::Continue => {
-                if let Event::Key(key_event) = key {
+            KeyPressResult::Continue => match event {
+                Event::Key(key_event) => {
                     if key_event.kind == KeyEventKind::Press {
                         self.text_data.handle_key_press(key_event)?;
                         self.scroll_in_view(
@@ -490,7 +509,26 @@ impl<H: CustomInputHandler> CoolInput<H> {
                         self.render()?;
                     }
                 }
-            }
+                Event::Mouse(mouse_event) => match mouse_event.kind {
+                    MouseEventKind::ScrollUp => {
+                        self.scroll_y = self.scroll_y.saturating_sub(1);
+                        self.render()?;
+                    }
+                    MouseEventKind::ScrollDown => {
+                        let input_transform = self.get_input_transform()?;
+                        let content_ends_y = self.text_data.text.split('\n').count() as u16
+                            + input_transform.offset.1;
+                        let (_, height) = self.get_terminal_size()?;
+                        let screen_ends_y = height + self.scroll_y as u16;
+                        if screen_ends_y <= content_ends_y {
+                            self.scroll_y += 1;
+                            self.render()?;
+                        }
+                    }
+                    _ => {}
+                },
+                _ => {}
+            },
         }
         Ok(())
     }
@@ -498,7 +536,7 @@ impl<H: CustomInputHandler> CoolInput<H> {
     pub fn listen_quiet(&mut self) -> Result<(), std::io::Error> {
         self.listening = true;
         while self.listening {
-            self.handle_key_press(event::read()?)?;
+            self.handle_event(event::read()?)?;
         }
         Ok(())
     }
@@ -508,6 +546,7 @@ impl<H: CustomInputHandler> CoolInput<H> {
         enable_raw_mode()?;
         execute!(
             stdout(),
+            EnableMouseCapture,
             terminal::Clear(terminal::ClearType::All),
             cursor::MoveTo(
                 (self.text_data.cursor_x as u16) + input_transform.offset.0,
@@ -521,6 +560,7 @@ impl<H: CustomInputHandler> CoolInput<H> {
         execute!(
             stdout(),
             ResetColor,
+            DisableMouseCapture,
             terminal::Clear(terminal::ClearType::All),
             cursor::MoveTo(0, 0),
             cursor::Show,
