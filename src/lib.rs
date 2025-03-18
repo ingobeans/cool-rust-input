@@ -8,6 +8,7 @@ use crossterm::{
     terminal::{self, disable_raw_mode, enable_raw_mode},
 };
 use std::cmp;
+use std::io::Result;
 use std::io::{self, stdout, Write};
 
 // Get slice of string by starting character index and end character index
@@ -28,12 +29,7 @@ fn get_slice_of_string(text: &str, start: usize, end: usize) -> String {
 }
 
 /// Helper function to draw text to the screen by a coordinate
-pub fn set_terminal_line(
-    text: &str,
-    x: usize,
-    y: usize,
-    overwrite: bool,
-) -> Result<(), std::io::Error> {
+pub fn set_terminal_line(text: &str, x: usize, y: usize, overwrite: bool) -> Result<()> {
     if overwrite {
         queue!(
             stdout(),
@@ -130,7 +126,7 @@ pub struct CoolInput<H: CustomInputHandler> {
 }
 
 impl TextInputData {
-    pub fn write_char(&mut self, c: char) -> Result<(), std::io::Error> {
+    pub fn write_char(&mut self, c: char) -> Result<()> {
         self.insert_char(c, self.cursor_x, self.cursor_y);
         self.move_cursor_right()?;
         Ok(())
@@ -157,7 +153,7 @@ impl TextInputData {
             self.text = new;
         }
     }
-    pub fn remove_character(&mut self, x: usize, y: usize) -> Result<(), std::io::Error> {
+    pub fn remove_character(&mut self, x: usize, y: usize) -> Result<()> {
         let mut new = String::new();
         let mut cur_x = 0;
         let mut cur_y = 0;
@@ -184,13 +180,13 @@ impl TextInputData {
         self.text = new;
         Ok(())
     }
-    fn move_cursor_end(&mut self) -> Result<(), std::io::Error> {
+    fn move_cursor_end(&mut self) -> Result<()> {
         if self.get_amt_lines() > 0 {
             self.cursor_x = self.get_current_line_length()?;
         }
         Ok(())
     }
-    fn move_cursor_up(&mut self) -> Result<(), std::io::Error> {
+    fn move_cursor_up(&mut self) -> Result<()> {
         if self.cursor_y > 0 {
             self.cursor_y -= 1;
             self.cursor_x = cmp::min(self.get_current_line_length()?, self.cursor_x);
@@ -199,7 +195,7 @@ impl TextInputData {
         }
         Ok(())
     }
-    fn move_cursor_down(&mut self) -> Result<(), std::io::Error> {
+    fn move_cursor_down(&mut self) -> Result<()> {
         if self.cursor_y < self.get_amt_lines() - 1 {
             self.cursor_y += 1;
             self.cursor_x = cmp::min(self.get_current_line_length()?, self.cursor_x);
@@ -208,7 +204,7 @@ impl TextInputData {
         }
         Ok(())
     }
-    fn move_cursor_left(&mut self) -> Result<(), std::io::Error> {
+    fn move_cursor_left(&mut self) -> Result<()> {
         if self.cursor_x > 0 || self.cursor_y != 0 {
             if self.cursor_x > 0 {
                 self.cursor_x -= 1;
@@ -219,7 +215,7 @@ impl TextInputData {
         }
         Ok(())
     }
-    fn move_cursor_right(&mut self) -> Result<(), std::io::Error> {
+    fn move_cursor_right(&mut self) -> Result<()> {
         if self.cursor_y != self.get_amt_lines() - 1
             || self.cursor_x < self.get_current_line_length()?
         {
@@ -246,7 +242,7 @@ impl TextInputData {
         }
         self.text.lines().nth(y)
     }
-    pub fn get_current_line_length(&mut self) -> Result<usize, std::io::Error> {
+    pub fn get_current_line_length(&mut self) -> Result<usize> {
         let line = self.get_line_at(self.cursor_y);
         match line {
             Some(text) => Ok(text.chars().count()),
@@ -256,7 +252,7 @@ impl TextInputData {
             )),
         }
     }
-    fn handle_key_press(&mut self, key_event: KeyEvent) -> Result<(), std::io::Error> {
+    fn handle_key_press(&mut self, key_event: KeyEvent) -> Result<()> {
         match key_event.code {
             KeyCode::Char(c) => {
                 self.insert_char(c, self.cursor_x, self.cursor_y);
@@ -334,12 +330,12 @@ impl<H: CustomInputHandler> CoolInput<H> {
         }
     }
     /// Get the size of the terminal running the program
-    pub fn get_terminal_size(&self) -> Result<(u16, u16), std::io::Error> {
+    pub fn get_terminal_size(&self) -> Result<(u16, u16)> {
         let mut terminal_size = terminal::size()?;
         terminal_size.1 -= 1;
         Ok(terminal_size)
     }
-    pub fn get_input_transform(&mut self) -> Result<InputTransform, std::io::Error> {
+    pub fn get_input_transform(&mut self) -> Result<InputTransform> {
         let terminal_size = self.get_terminal_size()?;
         let input_transform = self.custom_input.get_input_transform(HandlerContext {
             text_data: &mut self.text_data,
@@ -356,13 +352,13 @@ impl<H: CustomInputHandler> CoolInput<H> {
         Ok(InputTransform { size, offset })
     }
     /// Render all text and update cursor
-    pub fn render(&mut self) -> Result<(), std::io::Error> {
+    pub fn render(&mut self) -> Result<()> {
         self.update_text()?;
         self.update_cursor()?;
         io::stdout().flush()?;
         Ok(())
     }
-    fn update_cursor(&mut self) -> Result<(), std::io::Error> {
+    fn update_cursor(&mut self) -> Result<()> {
         if !self.cursor_within_screen()? {
             queue!(stdout(), cursor::Hide)?;
             return Ok(());
@@ -392,7 +388,7 @@ impl<H: CustomInputHandler> CoolInput<H> {
         });
         Ok(())
     }
-    fn update_text(&mut self) -> Result<(), std::io::Error> {
+    fn update_text(&mut self) -> Result<()> {
         let terminal_size = self.get_terminal_size()?;
         let input_transform = self.get_input_transform()?;
 
@@ -425,11 +421,7 @@ impl<H: CustomInputHandler> CoolInput<H> {
 
         Ok(())
     }
-    fn scroll_in_view(
-        &mut self,
-        moving_right: bool,
-        moving_down: bool,
-    ) -> Result<(), std::io::Error> {
+    fn scroll_in_view(&mut self, moving_right: bool, moving_down: bool) -> Result<()> {
         let input_transform = self.get_input_transform()?;
         self.scroll_x = self.keep_scroll_axis_in_view(
             self.scroll_x,
@@ -461,7 +453,7 @@ impl<H: CustomInputHandler> CoolInput<H> {
         }
         scroll_amt
     }
-    pub fn cursor_within_screen(&mut self) -> Result<bool, std::io::Error> {
+    pub fn cursor_within_screen(&mut self) -> Result<bool> {
         let input_transform = self.get_input_transform()?;
         let height = input_transform.size.1;
 
@@ -475,7 +467,7 @@ impl<H: CustomInputHandler> CoolInput<H> {
         Ok(show)
     }
     /// Handle an event
-    pub fn handle_event(&mut self, event: Event) -> Result<(), std::io::Error> {
+    pub fn handle_event(&mut self, event: Event) -> Result<()> {
         let terminal_size = self.get_terminal_size()?;
         let old_cursor_x = self.text_data.cursor_x;
         let old_cursor_y = self.text_data.cursor_y;
@@ -533,7 +525,7 @@ impl<H: CustomInputHandler> CoolInput<H> {
         Ok(())
     }
     /// Start listening for key presses without preparing the terminal
-    pub fn listen_quiet(&mut self) -> Result<(), std::io::Error> {
+    pub fn listen_quiet(&mut self) -> Result<()> {
         self.listening = true;
         while self.listening {
             self.handle_event(event::read()?)?;
@@ -541,7 +533,7 @@ impl<H: CustomInputHandler> CoolInput<H> {
         Ok(())
     }
     /// Prepare the terminal for input
-    pub fn pre_listen(&mut self) -> Result<(), std::io::Error> {
+    pub fn pre_listen(&mut self) -> Result<()> {
         let input_transform = self.get_input_transform()?;
         enable_raw_mode()?;
         execute!(
@@ -556,7 +548,7 @@ impl<H: CustomInputHandler> CoolInput<H> {
         Ok(())
     }
     /// Restore the terminal after input is finished.
-    pub fn post_listen(&mut self) -> Result<(), std::io::Error> {
+    pub fn post_listen(&mut self) -> Result<()> {
         execute!(
             stdout(),
             ResetColor,
@@ -569,7 +561,7 @@ impl<H: CustomInputHandler> CoolInput<H> {
         Ok(())
     }
     /// Prepare terminal and start to listen for key presses until finished.
-    pub fn listen(&mut self) -> Result<(), std::io::Error> {
+    pub fn listen(&mut self) -> Result<()> {
         self.pre_listen()?;
         self.render()?;
         self.listen_quiet()?;
